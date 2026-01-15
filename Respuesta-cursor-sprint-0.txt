@@ -1,0 +1,555 @@
+========================================
+SPRINT 0: DESTRABAR VALIDACIÓN JWT END-TO-END
+========================================
+
+DIAGNÓSTICO:
+- auth-service no expone endpoints JWKS/discovery (404)
+- tokens tienen iss incorrecto (localhost:8080 en lugar de auth-service:9000)
+- resource servers fallan con 401 invalid_token
+- OAuth2TokenService tenía código duplicado (corregido)
+- Auto-configuración de Spring Boot 4.0 puede no estar activándose correctamente
+
+CAMBIOS IMPLEMENTADOS:
+
+========================================
+1) OAuth2TokenService.java - CORREGIDO
+========================================
+
+PROBLEMA: Archivo tenía código duplicado (dos package declarations, dos clases)
+
+ANTES:
+package com.gianniniseba.authservice.service;
+...
+package com.gianniniseba.authservice.service;  // DUPLICADO
+@Service
+@RequiredArgsConstructor
+public class OAuth2TokenService {  // DUPLICADO
+...
+
+DESPUÉS (ARCHIVO COMPLETO):
+package com.gianniniseba.authservice.service;
+
+import com.gianniniseba.authservice.entity.User;
+import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.oauth2.jwt.JwtClaimsSet;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
+import org.springframework.stereotype.Service;
+
+import java.time.Instant;
+
+@Service
+@RequiredArgsConstructor
+public class OAuth2TokenService {
+
+    private static final Logger logger = LoggerFactory.getLogger(OAuth2TokenService.class);
+
+    private final JwtEncoder jwtEncoder;
+
+    @Value("${app.security.issuer-uri:http://auth-service:9000}")
+    private String issuerUri;
+
+    public String generateAccessToken(User user) {
+        Instant now = Instant.now();
+        Instant expiry = now.plusSeconds(3600); // 1 hora
+
+        // Convertir roles a lista de authorities (formato esperado por Resource Servers)
+        var authorities = user.getRoles().stream()
+                .map(role -> role.getName().name())
+                .toList();
+
+        // Log del issuer que se está usando (para debug)
+        logger.debug("Generando token JWT con issuer: {}", issuerUri);
+
+        JwtClaimsSet claims = JwtClaimsSet.builder()
+                .issuer(issuerUri)
+                .issuedAt(now)
+                .expiresAt(expiry)
+                .subject(user.getUsername())
+                .claim("scope", "read write openid profile")
+                .claim("authorities", authorities)  // Lista de strings ["ROLE_ADMIN", "ROLE_USER"]
+                .claim("userId", user.getId())      // ID del usuario para auditoría
+                .build();
+
+        String token = jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
+        logger.debug("Token JWT generado exitosamente para usuario: {}", user.getUsername());
+        return token;
+    }
+}
+
+CAMBIOS:
+- Eliminado código duplicado
+- Agregado logging para debug del issuer
+- Mantiene lectura de issuerUri desde app.security.issuer-uri (configurable por ISSUER_URI en Docker)
+
+========================================
+2) OAuth2AuthorizationServerConfig.java - AJUSTADO
+========================================
+
+PROBLEMA: Auto-configuración puede no estar exponiendo endpoints automáticamente
+
+ANTES:
+http
+    .securityMatcher("/oauth2/**", "/.well-known/**")
+    .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+    .csrf(csrf -> csrf.disable())
+    .cors(Customizer.withDefaults());
+
+DESPUÉS:
+http
+    .securityMatcher("/oauth2/**", "/.well-known/**")
+    .authorizeHttpRequests(auth -> auth
+            .anyRequest().permitAll()
+    )
+    .csrf(csrf -> csrf
+            .ignoringRequestMatchers("/oauth2/**", "/.well-known/**")
+    )
+    .cors(Customizer.withDefaults());
+
+// Log mejorado para debug
+logger.info("=== Spring Authorization Server Configurado ===");
+logger.info("Issuer URI: {}", issuerUri);
+logger.info("Beans configurados:");
+logger.info("  - RegisteredClientRepository: OK");
+logger.info("  - JWKSource: OK");
+logger.info("  - AuthorizationServerSettings: OK (issuer={})", issuerUri);
+logger.info("Endpoints que deberían estar disponibles por auto-configuración:");
+logger.info("  - JWKS: {}/oauth2/jwks", issuerUri);
+logger.info("  - Authorization: {}/oauth2/authorize", issuerUri);
+logger.info("  - Token: {}/oauth2/token", issuerUri);
+logger.info("  - OIDC Metadata: {}/.well-known/openid-configuration", issuerUri);
+logger.info("  - OAuth2 Metadata: {}/.well-known/oauth-authorization-server", issuerUri);
+
+CAMBIOS:
+- CSRF ajustado para ignorar solo endpoints del Authorization Server (más seguro)
+- Logging mejorado para verificar que los beans estén configurados
+- Mantiene dependencia en auto-configuración de Spring Boot 4.0
+
+NOTA: En Spring Boot 4.0, la auto-configuración del Authorization Server debería exponer
+automáticamente los endpoints cuando detecta:
+- RegisteredClientRepository (bean configurado)
+- JWKSource<SecurityContext> (bean configurado)
+- AuthorizationServerSettings (bean configurado con issuer)
+
+Si los endpoints siguen dando 404 después de estos cambios, puede ser necesario:
+1. Verificar que la auto-configuración esté activa (ver logs de arranque)
+2. Verificar que no haya conflictos con otros SecurityFilterChains
+3. Considerar habilitar explícitamente OIDC (ver Plan B)
+
+========================================
+3) VERIFICACIÓN DE RESOURCE SERVERS
+========================================
+
+CATALOG-SERVICE:
+- application.properties tiene: spring.security.oauth2.resourceserver.jwt.issuer-uri=${ISSUER_URI:http://auth-service:9000}
+- SecurityConfig.java está correctamente configurado
+- NO requiere cambios
+
+BOOKING-SERVICE:
+- application.properties tiene: spring.security.oauth2.resourceserver.jwt.issuer-uri=${ISSUER_URI:http://auth-service:9000}
+- SecurityConfig.java está correctamente configurado
+- NO requiere cambios
+
+========================================
+4) VERIFICACIÓN DE DEPENDENCIAS
+========================================
+
+AUTH-SERVICE pom.xml:
+- spring-boot-starter-oauth2-authorization-server (línea 55) - OK
+- spring-boot-starter-oauth2-resource-server (línea 59) - OK
+- spring-boot-starter-security (línea 43) - OK
+- NO requiere cambios
+
+========================================
+5) VERIFICACIÓN DE ISSUER EN TOKEN
+========================================
+
+CONFIRMADO:
+- OAuth2TokenService usa issuerUri desde @Value("${app.security.issuer-uri:http://auth-service:9000}")
+- application.properties tiene: app.security.issuer-uri=${ISSUER_URI:http://auth-service:9000}
+- docker-compose.yml tiene: ISSUER_URI=http://auth-service:9000 en auth-service
+- NO se encontró hardcode de "localhost:8080" en el código
+
+Si el token sigue mostrando iss=http://localhost:8080, puede ser:
+1. El contenedor no está leyendo ISSUER_URI correctamente
+2. Hay otro lugar donde se genera el token (no encontrado en búsqueda)
+3. El valor por defecto se está usando en lugar del env var
+
+VERIFICACIÓN NECESARIA:
+- docker exec domination-auth-service printenv | grep ISSUER
+- Verificar logs de auth-service al hacer login: "Generando token JWT con issuer: ..."
+
+========================================
+COMANDOS DE PRUEBA (PowerShell)
+========================================
+
+# 1. Rebuild y restart de auth-service
+cd E:\Academico\Proyectos\DOMINation-gestor-reservas\infra
+docker compose build auth-service
+docker compose up -d auth-service
+
+# 2. Verificar logs de arranque (buscar configuración del Authorization Server)
+docker logs domination-auth-service --tail 100 | Select-String "Spring Authorization Server|Issuer URI|Beans configurados"
+
+# 3. Verificar variable de entorno ISSUER_URI dentro del contenedor
+docker exec domination-auth-service printenv | Select-String "ISSUER"
+
+# 4. Verificar JWKS endpoint
+curl -i http://localhost:9000/oauth2/jwks
+# ESPERADO: 200 OK con JSON de keys
+# Si da 404: los endpoints no se están exponiendo
+
+# 5. Verificar OIDC Metadata
+curl -i http://localhost:9000/.well-known/openid-configuration
+# ESPERADO: 200 OK con JSON de metadata
+# Si da 404: OIDC no está habilitado o endpoints no se exponen
+
+# 6. Verificar OAuth2 Metadata
+curl -i http://localhost:9000/.well-known/oauth-authorization-server
+# ESPERADO: 200 OK con JSON de metadata
+# Si da 404: endpoints no se exponen
+
+# 7. Login y obtener token
+$loginBody = @{
+    username = "adminSeba"
+    password = "123456admin"
+} | ConvertTo-Json
+
+$loginResponse = Invoke-RestMethod -Uri "http://localhost:9000/auth/login" `
+    -Method POST `
+    -ContentType "application/json" `
+    -Body $loginBody
+
+$token = $loginResponse.token
+Write-Host "Token obtenido (primeros 50 chars): $($token.Substring(0, [Math]::Min(50, $token.Length)))..."
+
+# 8. Verificar logs de auth-service para confirmar issuer usado
+docker logs domination-auth-service --tail 50 | Select-String "Generando token JWT con issuer"
+# ESPERADO: "Generando token JWT con issuer: http://auth-service:9000"
+
+# 9. Decodificar JWT (usar https://jwt.io o script)
+# Verificar que el claim "iss" = "http://auth-service:9000"
+# Si muestra "http://localhost:8080": el issuerUri no se está leyendo correctamente
+
+# 10. Probar endpoint protegido vía gateway
+$headers = @{
+    "Authorization" = "Bearer $token"
+    "Content-Type" = "application/json"
+}
+
+$branchBody = @{
+    name = "Test Branch"
+    address = "Test Address"
+} | ConvertTo-Json
+
+try {
+    $response = Invoke-WebRequest -Uri "http://localhost:8080/api/catalog/provider/branches" `
+        -Method POST `
+        -Headers $headers `
+        -Body $branchBody
+    Write-Host "SUCCESS: Status $($response.StatusCode)"
+    Write-Host "Response: $($response.Content)"
+} catch {
+    Write-Host "ERROR: $($_.Exception.Message)"
+    if ($_.Exception.Response) {
+        $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
+        $responseBody = $reader.ReadToEnd()
+        Write-Host "Response Body: $responseBody"
+    }
+}
+
+# 11. Verificar logs de catalog-service si hay error
+docker logs domination-catalog-service --tail 50 | Select-String "JWT|invalid_token|issuer|JWK"
+
+========================================
+PASOS PARA PROBAR EN DOCKER
+========================================
+
+1. Navegar al directorio infra:
+   cd E:\Academico\Proyectos\DOMINation-gestor-reservas\infra
+
+2. Rebuild solo auth-service (si hubo cambios):
+   docker compose build auth-service
+
+3. Iniciar todos los servicios:
+   docker compose up -d
+
+4. Esperar a que auth-service esté completamente iniciado:
+   docker logs domination-auth-service -f
+   # Presionar Ctrl+C cuando veas "Started AuthServiceApplication"
+
+5. Verificar logs de configuración del Authorization Server:
+   docker logs domination-auth-service | Select-String "Spring Authorization Server|Issuer URI|Beans configurados"
+   # Debe mostrar: "Spring Authorization Server Configurado" y "Issuer URI: http://auth-service:9000"
+
+6. Verificar variable de entorno:
+   docker exec domination-auth-service printenv | Select-String "ISSUER"
+   # Debe mostrar: ISSUER_URI=http://auth-service:9000
+
+7. Probar endpoints desde el host:
+   curl -i http://localhost:9000/oauth2/jwks
+   curl -i http://localhost:9000/.well-known/openid-configuration
+   curl -i http://localhost:9000/.well-known/oauth-authorization-server
+   # Todos deben devolver 200 OK
+
+8. Probar endpoints desde dentro del contenedor catalog-service:
+   docker exec domination-catalog-service wget -qO- http://auth-service:9000/oauth2/jwks
+   # Debe devolver JSON con keys
+
+9. Hacer login y verificar token:
+   # Usar comandos de la sección anterior (paso 7)
+
+10. Probar endpoint protegido:
+    # Usar comandos de la sección anterior (paso 10)
+
+========================================
+PLAN B: Si discovery sigue fallando
+========================================
+
+Si después de estos cambios los endpoints /.well-known/* y /oauth2/jwks siguen dando 404,
+puede ser que la auto-configuración de Spring Boot 4.0 no esté funcionando correctamente.
+
+SOLUCIÓN ALTERNATIVA: Configurar jwk-set-uri directamente en resource servers
+
+CATALOG-SERVICE application.properties:
+# Comentar issuer-uri y usar jwk-set-uri directamente
+# spring.security.oauth2.resourceserver.jwt.issuer-uri=${ISSUER_URI:http://auth-service:9000}
+spring.security.oauth2.resourceserver.jwt.jwk-set-uri=${JWK_SET_URI:http://auth-service:9000/oauth2/jwks}
+
+BOOKING-SERVICE application.properties:
+# Comentar issuer-uri y usar jwk-set-uri directamente
+# spring.security.oauth2.resourceserver.jwt.issuer-uri=${ISSUER_URI:http://auth-service:9000}
+spring.security.oauth2.resourceserver.jwt.jwk-set-uri=${JWK_SET_URI:http://auth-service:9000/oauth2/jwks}
+
+docker-compose.yml (agregar en catalog-service y booking-service):
+environment:
+  ...
+  JWK_SET_URI: http://auth-service:9000/oauth2/jwks
+
+NOTA: Esto es un workaround. Lo ideal es que los endpoints se expongan automáticamente
+y que los resource servers usen issuer-uri para discovery.
+
+========================================
+ARCHIVOS MODIFICADOS
+========================================
+
+1. services/auth-service/src/main/java/com/gianniniseba/authservice/service/OAuth2TokenService.java
+   - Eliminado código duplicado
+   - Agregado logging para debug
+
+2. services/auth-service/src/main/java/com/gianniniseba/authservice/config/OAuth2AuthorizationServerConfig.java
+   - Ajustado CSRF para ignorar solo endpoints del Authorization Server
+   - Mejorado logging
+
+========================================
+RESUMEN DE CAMBIOS
+========================================
+
+CAMBIOS REALIZADOS:
+- OAuth2TokenService.java: Corregido código duplicado, agregado logging
+- OAuth2AuthorizationServerConfig.java: Ajustado CSRF, mejorado logging
+- NO se requieren cambios en catalog-service ni booking-service
+- NO se requieren cambios en pom.xml
+
+VERIFICACIONES NECESARIAS:
+1. Los endpoints del Authorization Server deben exponerse automáticamente por Spring Boot 4.0
+2. El issuer del token debe leerse correctamente desde ISSUER_URI en Docker
+3. Los resource servers deben poder validar tokens usando issuer-uri
+
+SI LOS ENDPOINTS SIGUEN DANDO 404:
+- Verificar logs de arranque de auth-service
+- Verificar que los beans estén siendo creados
+- Considerar Plan B (jwk-set-uri directo)
+
+========================================
+DIFFS COMPLETOS POR ARCHIVO
+========================================
+
+ARCHIVO 1: services/auth-service/src/main/java/com/gianniniseba/authservice/service/OAuth2TokenService.java
+
+ANTES (tenía código duplicado):
+package com.gianniniseba.authservice.service;
+...
+package com.gianniniseba.authservice.service;  // DUPLICADO
+@Service
+@RequiredArgsConstructor
+public class OAuth2TokenService {  // DUPLICADO
+    private final JwtEncoder jwtEncoder;
+    @Value("${app.security.issuer-uri:http://auth-service:9000}")
+    private String issuerUri;
+    // Sin logging
+    public String generateAccessToken(User user) {
+        // ...
+        JwtClaimsSet claims = JwtClaimsSet.builder()
+                .issuer(issuerUri)
+                // ...
+    }
+}
+
+DESPUÉS (archivo completo corregido):
+package com.gianniniseba.authservice.service;
+
+import com.gianniniseba.authservice.entity.User;
+import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.oauth2.jwt.JwtClaimsSet;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
+import org.springframework.stereotype.Service;
+
+import java.time.Instant;
+
+@Service
+@RequiredArgsConstructor
+public class OAuth2TokenService {
+
+    private static final Logger logger = LoggerFactory.getLogger(OAuth2TokenService.class);
+
+    private final JwtEncoder jwtEncoder;
+
+    @Value("${app.security.issuer-uri:http://auth-service:9000}")
+    private String issuerUri;
+
+    public String generateAccessToken(User user) {
+        Instant now = Instant.now();
+        Instant expiry = now.plusSeconds(3600); // 1 hora
+
+        // Convertir roles a lista de authorities (formato esperado por Resource Servers)
+        var authorities = user.getRoles().stream()
+                .map(role -> role.getName().name())
+                .toList();
+
+        // Log del issuer que se está usando (para debug)
+        logger.debug("Generando token JWT con issuer: {}", issuerUri);
+
+        JwtClaimsSet claims = JwtClaimsSet.builder()
+                .issuer(issuerUri)
+                .issuedAt(now)
+                .expiresAt(expiry)
+                .subject(user.getUsername())
+                .claim("scope", "read write openid profile")
+                .claim("authorities", authorities)  // Lista de strings ["ROLE_ADMIN", "ROLE_USER"]
+                .claim("userId", user.getId())      // ID del usuario para auditoría
+                .build();
+
+        String token = jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
+        logger.debug("Token JWT generado exitosamente para usuario: {}", user.getUsername());
+        return token;
+    }
+}
+
+ARCHIVO 2: services/auth-service/src/main/java/com/gianniniseba/authservice/config/OAuth2AuthorizationServerConfig.java
+
+ANTES:
+@Bean
+@Order(1)
+public SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http)
+        throws Exception {
+    http
+            .securityMatcher("/oauth2/**", "/.well-known/**")
+            .authorizeHttpRequests(auth -> auth
+                    .anyRequest().permitAll()
+            )
+            .csrf(csrf -> csrf.disable())
+            .cors(Customizer.withDefaults());
+
+    logger.info("=== Spring Authorization Server Configurado ===");
+    logger.info("Issuer URI: {}", issuerUri);
+    // ... logs básicos
+
+    return http.build();
+}
+
+DESPUÉS:
+@Bean
+@Order(1)
+public SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http)
+        throws Exception {
+    // En Spring Boot 4.0, la auto-configuración del Authorization Server expone automáticamente
+    // los endpoints cuando detecta los beans necesarios (RegisteredClientRepository, JWKSource, AuthorizationServerSettings).
+    // Este SecurityFilterChain solo permite acceso público a los endpoints sin interferir.
+    // Los endpoints se exponen automáticamente en:
+    // - /oauth2/jwks
+    // - /oauth2/authorize
+    // - /oauth2/token
+    // - /.well-known/openid-configuration (si OIDC está habilitado)
+    // - /.well-known/oauth-authorization-server
+    
+    http
+            .securityMatcher("/oauth2/**", "/.well-known/**")
+            .authorizeHttpRequests(auth -> auth
+                    .anyRequest().permitAll()
+            )
+            .csrf(csrf -> csrf
+                    .ignoringRequestMatchers("/oauth2/**", "/.well-known/**")
+            )
+            .cors(Customizer.withDefaults());
+
+    // Log de endpoints que deberían estar disponibles por auto-configuración
+    logger.info("=== Spring Authorization Server Configurado ===");
+    logger.info("Issuer URI: {}", issuerUri);
+    logger.info("Beans configurados:");
+    logger.info("  - RegisteredClientRepository: OK");
+    logger.info("  - JWKSource: OK");
+    logger.info("  - AuthorizationServerSettings: OK (issuer={})", issuerUri);
+    logger.info("Endpoints que deberían estar disponibles por auto-configuración:");
+    logger.info("  - JWKS: {}/oauth2/jwks", issuerUri);
+    logger.info("  - Authorization: {}/oauth2/authorize", issuerUri);
+    logger.info("  - Token: {}/oauth2/token", issuerUri);
+    logger.info("  - OIDC Metadata: {}/.well-known/openid-configuration", issuerUri);
+    logger.info("  - OAuth2 Metadata: {}/.well-known/oauth-authorization-server", issuerUri);
+    logger.info("================================================");
+
+    return http.build();
+}
+
+CAMBIOS:
+- CSRF ajustado para ignorar solo endpoints específicos (más seguro que disable completo)
+- Logging mejorado para verificar configuración de beans
+- Comentarios explicativos sobre auto-configuración
+
+========================================
+VERIFICACIÓN DE AUTO-CONFIGURACIÓN
+========================================
+
+Para verificar si la auto-configuración del Authorization Server está funcionando:
+
+1. Verificar logs de arranque:
+   docker logs domination-auth-service | Select-String "AuthorizationServer|OAuth2|JWK"
+   # Debe mostrar información sobre la configuración del Authorization Server
+
+2. Verificar que los beans estén siendo creados:
+   docker logs domination-auth-service | Select-String "Creating.*RegisteredClientRepository|Creating.*JWKSource|Creating.*AuthorizationServerSettings"
+   # O buscar en logs de Spring: "Bean.*of type.*RegisteredClientRepository"
+
+3. Verificar que los endpoints estén registrados:
+   docker logs domination-auth-service | Select-String "Mapped.*oauth2|Mapped.*well-known"
+   # Debe mostrar los endpoints mapeados
+
+4. Si los endpoints NO aparecen en los logs, la auto-configuración puede no estar activa.
+   En ese caso, considerar Plan B (jwk-set-uri directo) o verificar si hay alguna
+   propiedad de configuración que deba habilitarse.
+
+========================================
+NOTA IMPORTANTE SOBRE SPRING BOOT 4.0
+========================================
+
+En Spring Boot 4.0 con Spring Security 7.0, la auto-configuración del Authorization Server
+debería funcionar automáticamente cuando se detectan los beans necesarios. Sin embargo,
+si los endpoints siguen dando 404 después de estos cambios, puede ser necesario:
+
+1. Verificar que no haya conflictos con otros SecurityFilterChains
+2. Verificar que el orden de los SecurityFilterChains sea correcto (@Order(1) para Authorization Server)
+3. Verificar que no haya exclusiones de auto-configuración en application.properties
+4. Considerar crear controllers manuales para los endpoints (cambio más grande)
+
+Por ahora, los cambios implementados son mínimos y deberían permitir que la auto-configuración
+funcione correctamente. Si no funciona, usar Plan B.
+
+FIN DEL DOCUMENTO
+

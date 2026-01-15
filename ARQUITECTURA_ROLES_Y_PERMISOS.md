@@ -153,8 +153,7 @@ Usuario (abstract)
 
 **Claims Críticos:**
 - `authorities`: Lista de roles (usado por Spring Security)
-- `userId`: ID del usuario en auth DB (para auditoría y logs)
-- `providerId`: ID del prestador (SOLO si tiene `ROLE_PROVIDER`) - **CRÍTICO** para validar ownership de sucursales
+- `userId`: ID del usuario en auth DB (usado para auditoría, logs Y como providerId para ownership)
 
 ### B.3) ARQUITECTURA DE PERMISOS V2
 

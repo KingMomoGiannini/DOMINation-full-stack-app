@@ -29,22 +29,35 @@ public class OAuth2ResourceServerConfig {
 
     @Bean
     @Order(2)
-    public SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http)
+    public SecurityFilterChain publicSecurityFilterChain(HttpSecurity http)
             throws Exception {
         http
+                .securityMatcher("/auth/login", "/auth/register", "/actuator/**")
+                .csrf(csrf -> csrf.disable())
+                .cors(withDefaults())
+                .authorizeHttpRequests(auth -> auth
+                        .anyRequest().permitAll()
+                );
+
+        return http.build();
+    }
+
+    @Bean
+    @Order(3)
+    public SecurityFilterChain apiSecurityFilterChain(HttpSecurity http)
+            throws Exception {
+        http
+                .securityMatcher("/users/**", "/admin/**", "/auth/provider-requests/**", "/test/**")
                 .csrf(csrf -> csrf.disable())
                 .cors(withDefaults())
                 .sessionManagement(sm ->
                         sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/auth/**").permitAll()
-                        .requestMatchers("/oauth2/**").permitAll()
-                        .requestMatchers("/.well-known/**").permitAll()
-                        .requestMatchers("/login").permitAll()
-                        .requestMatchers("/test/**").authenticated()
-                        .requestMatchers("/users/me").authenticated()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/auth/provider-requests/**").authenticated()
+                        .requestMatchers("/users/**").authenticated()
+                        .requestMatchers("/test/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2

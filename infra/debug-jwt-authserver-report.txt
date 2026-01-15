@@ -1,0 +1,1049 @@
+========================
+0) ÁRBOL DEL REPO
+========================
+
+DOMINation-gestor-reservas/
+├── infra/
+│   ├── docker-compose.yml
+│   └── debug-jwt-authserver-report.txt (este archivo)
+├── gateway/
+│   ├── pom.xml
+│   ├── Dockerfile
+│   └── src/main/resources/application.properties
+├── services/
+│   ├── auth-service/
+│   │   ├── pom.xml
+│   │   ├── Dockerfile
+│   │   └── src/main/
+│   │       ├── resources/application.properties
+│   │       └── java/com/gianniniseba/authservice/
+│   │           ├── config/
+│   │           │   ├── OAuth2AuthorizationServerConfig.java
+│   │           │   ├── OAuth2ResourceServerConfig.java
+│   │           │   └── SecurityConfig.java (deshabilitado)
+│   │           └── service/
+│   │               └── OAuth2TokenService.java
+│   ├── catalog-service/
+│   │   ├── pom.xml
+│   │   ├── Dockerfile
+│   │   └── src/main/
+│   │       ├── resources/application.properties
+│   │       └── java/com/domination/catalog/
+│   │           └── config/
+│   │               └── SecurityConfig.java
+│   └── booking-service/
+│       ├── pom.xml
+│       ├── Dockerfile
+│       └── src/main/
+│           ├── resources/application.properties
+│           └── java/com/domination/booking/
+│               └── config/
+│                   └── SecurityConfig.java
+
+========================
+1) VERSIONES EFECTIVAS
+========================
+
+Maven:
+- Apache Maven 3.9.9
+- Java version: 21.0.8 (Oracle Corporation)
+- Maven home: C:\workspace\apache-maven-3.9.9
+
+AUTH-SERVICE:
+- Spring Boot: 4.0.0 (parent)
+- Java: 21 (source/target)
+- Dependencias OAuth2:
+  * spring-boot-starter-oauth2-authorization-server (sin version explícita, gestionada por Boot 4.0.0)
+  * spring-boot-starter-oauth2-resource-server (sin version explícita, gestionada por Boot 4.0.0)
+  * spring-boot-starter-security (sin version explícita, gestionada por Boot 4.0.0)
+
+CATALOG-SERVICE:
+- Spring Boot: 4.0.1 (parent)
+- Java: 21 (source/target)
+- Dependencias OAuth2:
+  * spring-boot-starter-oauth2-resource-server (sin version explícita, gestionada por Boot 4.0.1)
+  * spring-boot-starter-security (sin version explícita, gestionada por Boot 4.0.1)
+
+BOOKING-SERVICE:
+- Spring Boot: 4.0.1 (parent)
+- Java: 21 (source/target)
+- Dependencias OAuth2:
+  * spring-boot-starter-oauth2-resource-server (sin version explícita, gestionada por Boot 4.0.1)
+  * spring-boot-starter-security (sin version explícita, gestionada por Boot 4.0.1)
+
+GATEWAY:
+- Spring Boot: 3.5.9 (parent)
+- Spring Cloud: 2025.0.1
+- Java: 21
+- Dependencias:
+  * spring-cloud-starter-gateway (sin version explícita, gestionada por Spring Cloud 2025.0.1)
+
+NOTA: No se pudo obtener el output completo de "mvn dependency:tree" filtrado por oauth2/security.
+Los comandos ejecutados no devolvieron salida. Se requiere ejecutar manualmente:
+  - cd services/auth-service && mvn dependency:tree | grep -i "oauth2\|authorization\|security\|jose"
+  - cd services/catalog-service && mvn dependency:tree | grep -i "oauth2\|resource\|security\|jose"
+
+========================
+2) DOCKER / COMPOSE
+========================
+
+ARCHIVO: infra/docker-compose.yml
+
+SERVICIOS RELEVANTES:
+
+auth-service:
+  container_name: domination-auth-service
+  ports: "9000:9000"
+  environment:
+    SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-auth:5432/auth_db
+    SPRING_DATASOURCE_USERNAME: postgres
+    SPRING_DATASOURCE_PASSWORD: postgres
+    ISSUER_URI: http://auth-service:9000
+  depends_on:
+    postgres-auth:
+      condition: service_healthy
+  networks:
+    - domination-network
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+
+catalog-service:
+  container_name: domination-catalog-service
+  ports: "8081:8081"
+  environment:
+    SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-catalog:5432/domination_catalog
+    SPRING_DATASOURCE_USERNAME: domination
+    SPRING_DATASOURCE_PASSWORD: domination123
+    ISSUER_URI: http://auth-service:9000
+  depends_on:
+    postgres-catalog:
+      condition: service_healthy
+    auth-service:
+      condition: service_started
+  networks:
+    - domination-network
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+
+booking-service:
+  container_name: domination-booking-service
+  ports: "8082:8082"
+  environment:
+    SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-booking:5432/domination_booking
+    SPRING_DATASOURCE_USERNAME: domination
+    SPRING_DATASOURCE_PASSWORD: domination123
+    ISSUER_URI: http://auth-service:9000
+    CATALOG_SERVICE_URL: http://catalog-service:8081
+  depends_on:
+    postgres-booking:
+      condition: service_healthy
+    catalog-service:
+      condition: service_started
+    auth-service:
+      condition: service_started
+  networks:
+    - domination-network
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+
+gateway:
+  container_name: domination-gateway
+  ports: "8080:8080"
+  depends_on:
+    catalog-service:
+      condition: service_started
+    booking-service:
+      condition: service_started
+  networks:
+    - domination-network
+
+VARIABLES DE ENTORNO RELACIONADAS A JWT/ISSUER:
+- ISSUER_URI=http://auth-service:9000 (en auth-service, catalog-service, booking-service)
+
+RED:
+- domination-network (driver: bridge)
+
+========================
+3) AUTH-SERVICE (AUDITORÍA)
+========================
+
+3.1 application.properties COMPLETO:
+
+spring.application.name=auth-service
+
+# Puerto de la API
+server.port=9000
+
+# Configuración de la base de datos PostgreSQL
+spring.datasource.url=jdbc:postgresql://localhost:5432/auth_db
+spring.datasource.username=postgres
+spring.datasource.password=postgres
+spring.datasource.driver-class-name=org.postgresql.Driver
+
+# JPA / Hibernate
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+
+# Opcional pero recomendado para PostgreSQL
+spring.jpa.properties.hibernate.jdbc.lob.non_contextual_creation=true
+
+# (Opcional) Nivel de logs de SQL
+logging.level.org.hibernate.SQL=DEBUG
+logging.level.org.hibernate.type.descriptor.sql.BasicBinder=TRACE
+
+# OAuth2 Configuration
+# Los tokens OAuth2 se generan usando RSA keys (configuradas en código)
+# El issuer del servidor de autorización (configurable por env var ISSUER_URI)
+app.security.issuer-uri=${ISSUER_URI:http://auth-service:9000}
+# Configuración de tokens (opcional, valores por defecto en código)
+# Access token expiration: 1 hora (3600 segundos)
+# Refresh token expiration: 7 días
+
+PROPIEDADES RELEVANTES:
+- server.port=9000
+- app.security.issuer-uri=${ISSUER_URI:http://auth-service:9000}
+- NO hay spring.security.oauth2.authorizationserver.* configurado en properties
+- NO hay logging específico para OAuth2/Authorization Server
+
+3.2 Configuración de Spring Security:
+
+ARCHIVO 1: OAuth2AuthorizationServerConfig.java (COMPLETO)
+
+package com.gianniniseba.authservice.config;
+
+import com.nimbusds.jose.jwk.JWKSet;
+import com.nimbusds.jose.jwk.RSAKey;
+import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
+import com.nimbusds.jose.jwk.source.JWKSource;
+import com.nimbusds.jose.proc.SecurityContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
+import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
+import org.springframework.security.oauth2.core.oidc.OidcScopes;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.oauth2.server.authorization.client.InMemoryRegisteredClientRepository;
+import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
+import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
+import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
+import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
+import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.beans.factory.annotation.Value;
+
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.interfaces.RSAPrivateKey;
+import java.security.interfaces.RSAPublicKey;
+import java.time.Duration;
+import java.util.UUID;
+
+@Configuration
+@EnableWebSecurity
+public class OAuth2AuthorizationServerConfig {
+
+    private static final Logger logger = LoggerFactory.getLogger(OAuth2AuthorizationServerConfig.class);
+
+    @Value("${app.security.issuer-uri:http://auth-service:9000}")
+    private String issuerUri;
+
+    @Bean
+    @Order(1)
+    public SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http)
+            throws Exception {
+        // Configurar matchers para endpoints del Authorization Server
+        http
+                .securityMatcher("/oauth2/**", "/.well-known/**")
+                .authorizeHttpRequests(auth -> auth
+                        .anyRequest().permitAll()
+                )
+                .csrf(csrf -> csrf.disable())
+                .cors(Customizer.withDefaults());
+
+        // Log de endpoints expuestos
+        logger.info("=== Spring Authorization Server Configurado ===");
+        logger.info("Issuer URI: {}", issuerUri);
+        logger.info("Endpoints expuestos:");
+        logger.info("  - JWKS: {}/oauth2/jwks", issuerUri);
+        logger.info("  - Authorization: {}/oauth2/authorize", issuerUri);
+        logger.info("  - Token: {}/oauth2/token", issuerUri);
+        logger.info("  - OIDC Metadata: {}/.well-known/openid-configuration", issuerUri);
+        logger.info("  - OAuth2 Metadata: {}/.well-known/oauth-authorization-server", issuerUri);
+        logger.info("================================================");
+
+        return http.build();
+    }
+
+    @Bean
+    public RegisteredClientRepository registeredClientRepository() {
+        RegisteredClient oidcClient = RegisteredClient.withId(UUID.randomUUID().toString())
+                .clientId("react-client")
+                .clientSecret(passwordEncoder().encode("secret"))
+                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
+                .redirectUri("http://localhost:5173/callback")
+                .postLogoutRedirectUri("http://localhost:5173")
+                .scope(OidcScopes.OPENID)
+                .scope(OidcScopes.PROFILE)
+                .scope("read")
+                .scope("write")
+                .clientSettings(ClientSettings.builder()
+                        .requireAuthorizationConsent(false)
+                        .build())
+                .tokenSettings(TokenSettings.builder()
+                        .accessTokenTimeToLive(Duration.ofHours(1))
+                        .refreshTokenTimeToLive(Duration.ofDays(7))
+                        .reuseRefreshTokens(true)
+                        .build())
+                .build();
+
+        return new InMemoryRegisteredClientRepository(oidcClient);
+    }
+
+    @Bean
+    public JWKSource<SecurityContext> jwkSource() {
+        KeyPair keyPair = getStaticKeyPair();
+        RSAPublicKey publicKey = (RSAPublicKey) keyPair.getPublic();
+        RSAPrivateKey privateKey = (RSAPrivateKey) keyPair.getPrivate();
+        RSAKey rsaKey = new RSAKey.Builder(publicKey)
+                .privateKey(privateKey)
+                .keyID(UUID.randomUUID().toString())
+                .build();
+        JWKSet jwkSet = new JWKSet(rsaKey);
+        return new ImmutableJWKSet<>(jwkSet);
+    }
+
+    private static KeyPair generateRsaKey() {
+        KeyPair keyPair;
+        try {
+            KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
+            keyPairGenerator.initialize(2048);
+            keyPair = keyPairGenerator.generateKeyPair();
+        } catch (Exception ex) {
+            throw new IllegalStateException(ex);
+        }
+        return keyPair;
+    }
+
+    private static KeyPair staticKeyPair;
+    
+    private static synchronized KeyPair getStaticKeyPair() {
+        if (staticKeyPair == null) {
+            staticKeyPair = generateRsaKey();
+        }
+        return staticKeyPair;
+    }
+
+    @Bean
+    public JwtDecoder jwtDecoder() {
+        try {
+            RSAPublicKey publicKey = (RSAPublicKey) getStaticKeyPair().getPublic();
+            return NimbusJwtDecoder.withPublicKey(publicKey).build();
+        } catch (Exception e) {
+            throw new IllegalStateException("Error al crear JwtDecoder", e);
+        }
+    }
+
+    @Bean
+    public JwtEncoder jwtEncoder(JWKSource<SecurityContext> jwkSource) {
+        return new NimbusJwtEncoder(jwkSource);
+    }
+
+    @Bean
+    public AuthorizationServerSettings authorizationServerSettings() {
+        return AuthorizationServerSettings.builder()
+                .issuer(issuerUri)
+                .build();
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+}
+
+OBSERVACIONES CRÍTICAS:
+- NO se está usando OAuth2AuthorizationServerConfiguration.applyDefaultSecurity(http)
+- NO se está habilitando OIDC explícitamente
+- Solo se configura securityMatcher("/oauth2/**", "/.well-known/**") con permitAll()
+- Los endpoints del Authorization Server NO están siendo expuestos automáticamente
+- Spring Boot 4.0 requiere auto-configuración, pero puede que no esté activándose
+
+ARCHIVO 2: OAuth2ResourceServerConfig.java (COMPLETO)
+
+package com.gianniniseba.authservice.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
+
+import static org.springframework.security.config.Customizer.withDefaults;
+
+@Configuration
+@EnableWebSecurity
+public class OAuth2ResourceServerConfig {
+
+    private final JwtDecoder jwtDecoder;
+
+    public OAuth2ResourceServerConfig(JwtDecoder jwtDecoder) {
+        this.jwtDecoder = jwtDecoder;
+    }
+
+    @Bean
+    @Order(2)
+    public SecurityFilterChain publicSecurityFilterChain(HttpSecurity http)
+            throws Exception {
+        http
+                .securityMatcher("/auth/login", "/auth/register", "/actuator/**")
+                .csrf(csrf -> csrf.disable())
+                .cors(withDefaults())
+                .authorizeHttpRequests(auth -> auth
+                        .anyRequest().permitAll()
+                );
+
+        return http.build();
+    }
+
+    @Bean
+    @Order(3)
+    public SecurityFilterChain apiSecurityFilterChain(HttpSecurity http)
+            throws Exception {
+        http
+                .securityMatcher("/users/**", "/admin/**", "/auth/provider-requests/**", "/test/**")
+                .csrf(csrf -> csrf.disable())
+                .cors(withDefaults())
+                .sessionManagement(sm ->
+                        sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                )
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/auth/provider-requests/**").authenticated()
+                        .requestMatchers("/users/**").authenticated()
+                        .requestMatchers("/test/**").authenticated()
+                        .anyRequest().authenticated()
+                )
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .jwt(jwt -> jwt
+                                .decoder(jwtDecoder)
+                                .jwtAuthenticationConverter(jwtAuthenticationConverter())
+                        )
+                );
+
+        return http.build();
+    }
+
+    @Bean
+    public JwtAuthenticationConverter jwtAuthenticationConverter() {
+        JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
+        converter.setJwtGrantedAuthoritiesConverter(jwt -> {
+            // Extraemos los roles del claim "authorities" o "roles"
+            Object authoritiesClaim = jwt.getClaim("authorities");
+            if (authoritiesClaim != null) {
+                if (authoritiesClaim instanceof String) {
+                    String authoritiesStr = (String) authoritiesClaim;
+                    return java.util.stream.Stream.of(authoritiesStr.split("\\s+"))
+                            .filter(auth -> !auth.isEmpty())
+                            .map(org.springframework.security.core.authority.SimpleGrantedAuthority::new)
+                            .collect(java.util.stream.Collectors.toList());
+                } else if (authoritiesClaim instanceof List) {
+                    @SuppressWarnings("unchecked")
+                    List<String> authoritiesList = (List<String>) authoritiesClaim;
+                    return authoritiesList.stream()
+                            .map(org.springframework.security.core.authority.SimpleGrantedAuthority::new)
+                            .collect(java.util.stream.Collectors.toList());
+                }
+            }
+            
+            // Si no hay authorities, intentamos con "roles"
+            Object rolesClaim = jwt.getClaim("roles");
+            if (rolesClaim != null) {
+                if (rolesClaim instanceof String) {
+                    String rolesStr = (String) rolesClaim;
+                    return java.util.stream.Stream.of(rolesStr.split("\\s+"))
+                            .filter(role -> !role.isEmpty())
+                            .map(org.springframework.security.core.authority.SimpleGrantedAuthority::new)
+                            .collect(java.util.stream.Collectors.toList());
+                } else if (rolesClaim instanceof List) {
+                    @SuppressWarnings("unchecked")
+                    List<String> rolesList = (List<String>) rolesClaim;
+                    return rolesList.stream()
+                            .map(org.springframework.security.core.authority.SimpleGrantedAuthority::new)
+                            .collect(java.util.stream.Collectors.toList());
+                }
+            }
+            
+            return java.util.Collections.emptyList();
+        });
+        return converter;
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+
+        config.setAllowedOrigins(List.of("http://localhost:5173"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        config.setExposedHeaders(List.of("Authorization"));
+        config.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
+    }
+}
+
+3.3 Token issuance:
+
+ARCHIVO: OAuth2TokenService.java (COMPLETO)
+
+package com.gianniniseba.authservice.service;
+
+import com.gianniniseba.authservice.entity.User;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.oauth2.jwt.JwtClaimsSet;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
+import org.springframework.stereotype.Service;
+
+import java.time.Instant;
+
+@Service
+@RequiredArgsConstructor
+public class OAuth2TokenService {
+
+    private final JwtEncoder jwtEncoder;
+
+    @Value("${app.security.issuer-uri:http://auth-service:9000}")
+    private String issuerUri;
+
+    public String generateAccessToken(User user) {
+        Instant now = Instant.now();
+        Instant expiry = now.plusSeconds(3600); // 1 hora
+
+        // Convertir roles a lista de authorities (formato esperado por Resource Servers)
+        var authorities = user.getRoles().stream()
+                .map(role -> role.getName().name())
+                .toList();
+
+        JwtClaimsSet claims = JwtClaimsSet.builder()
+                .issuer(issuerUri)
+                .issuedAt(now)
+                .expiresAt(expiry)
+                .subject(user.getUsername())
+                .claim("scope", "read write openid profile")
+                .claim("authorities", authorities)  // Lista de strings ["ROLE_ADMIN", "ROLE_USER"]
+                .claim("userId", user.getId())      // ID del usuario para auditoría
+                .build();
+
+        return jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
+    }
+}
+
+CONFIRMACIÓN DEL ISSUER:
+- El claim "iss" se setea en la línea 32: .issuer(issuerUri)
+- issuerUri se lee de: @Value("${app.security.issuer-uri:http://auth-service:9000}")
+- Valor final esperado: http://auth-service:9000 (si ISSUER_URI está configurado en Docker)
+- PROBLEMA REPORTADO: El JWT decodificado muestra "iss" = "http://localhost:8080"
+- Esto sugiere que issuerUri NO está tomando el valor correcto, o hay otro lugar donde se genera el token
+
+3.4 Endpoints reales expuestos por auth-service:
+
+ENDPOINTS ESPERADOS (según logs en OAuth2AuthorizationServerConfig):
+- /.well-known/openid-configuration
+- /.well-known/oauth-authorization-server
+- /oauth2/jwks
+- /oauth2/authorize
+- /oauth2/token
+
+CONFIGURACIÓN ACTUAL:
+- SecurityFilterChain con @Order(1) matchea "/oauth2/**" y "/.well-known/**" con permitAll()
+- Se configuran los beans necesarios:
+  * RegisteredClientRepository
+  * JWKSource<SecurityContext>
+  * AuthorizationServerSettings (con issuer configurado)
+  * JwtEncoder (usa el mismo JWKSource)
+
+PROBLEMA IDENTIFICADO:
+- NO se está usando OAuth2AuthorizationServerConfiguration.applyDefaultSecurity(http)
+- En Spring Boot 4.0, la auto-configuración del Authorization Server puede NO activarse automáticamente
+- Los endpoints pueden NO estar siendo expuestos porque falta la configuración explícita
+- Los 404 reportados en /.well-known/* y /oauth2/jwks confirman que los endpoints NO están disponibles
+
+========================
+4) CATALOG-SERVICE y BOOKING-SERVICE (RESOURCE SERVER)
+========================
+
+4.1 CATALOG-SERVICE - application.properties COMPLETO:
+
+# Application
+spring.application.name=catalog-service
+server.port=8081
+
+# Database
+spring.datasource.url=jdbc:postgresql://localhost:5432/domination_catalog
+spring.datasource.username=domination
+spring.datasource.password=domination123
+spring.datasource.driver-class-name=org.postgresql.Driver
+
+# JPA/Hibernate
+spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+
+# OAuth2 Resource Server
+# Usa issuer-uri para descubrir automáticamente JWKS desde {issuer}/oauth2/jwks
+spring.security.oauth2.resourceserver.jwt.issuer-uri=${ISSUER_URI:http://auth-service:9000}
+# Alternativa si issuer-uri no funciona: usar jwk-set-uri directamente
+# spring.security.oauth2.resourceserver.jwt.jwk-set-uri=${JWK_SET_URI:http://auth-service:9000/oauth2/jwks}
+
+# Actuator
+management.endpoints.web.exposure.include=health,info
+management.endpoint.health.show-details=always
+
+# Logging
+logging.level.com.domination.catalog=DEBUG
+logging.level.org.springframework.security=DEBUG
+logging.level.org.hibernate.SQL=DEBUG
+
+# SpringDoc OpenAPI
+springdoc.api-docs.path=/api-docs
+springdoc.swagger-ui.path=/swagger-ui.html
+
+PROPIEDADES RELEVANTES:
+- spring.security.oauth2.resourceserver.jwt.issuer-uri=${ISSUER_URI:http://auth-service:9000}
+- ISSUER_URI está configurado en docker-compose.yml como: http://auth-service:9000
+- logging.level.org.springframework.security=DEBUG (debería mostrar errores de validación JWT)
+
+4.2 CATALOG-SERVICE - SecurityConfig.java (COMPLETO):
+
+package com.domination.catalog.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.Arrays;
+
+@Configuration
+@EnableWebSecurity
+@EnableMethodSecurity
+public class SecurityConfig {
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+            .cors(cors -> cors.configure(http))
+            .csrf(csrf -> csrf.disable())
+            .sessionManagement(session -> 
+                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            )
+            .authorizeHttpRequests(auth -> auth
+                // Endpoints públicos - GET solamente
+                .requestMatchers(HttpMethod.GET, "/api/catalog/branches/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/catalog/items/**").permitAll()
+                
+                // Swagger & Actuator públicos
+                .requestMatchers("/actuator/**").permitAll()
+                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
+                
+                // Admin endpoints requieren ROLE_ADMIN (por URL)
+                .requestMatchers("/api/catalog/admin/**").hasRole("ADMIN")
+                
+                // Provider endpoints (protegidos por @PreAuthorize en controller)
+                .requestMatchers("/api/catalog/provider/**").authenticated()
+                
+                // Cualquier otra request requiere autenticación
+                .anyRequest().authenticated()
+            )
+            .oauth2ResourceServer(oauth2 -> oauth2
+                .jwt(jwt -> jwt
+                    .jwtAuthenticationConverter(jwtAuthenticationConverter())
+                )
+            );
+
+        return http.build();
+    }
+
+    @Bean
+    public JwtAuthenticationConverter jwtAuthenticationConverter() {
+        JwtGrantedAuthoritiesConverter grantedAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
+        grantedAuthoritiesConverter.setAuthoritiesClaimName("authorities");
+        grantedAuthoritiesConverter.setAuthorityPrefix("");
+        JwtAuthenticationConverter jwtAuthenticationConverter = new JwtAuthenticationConverter();
+        jwtAuthenticationConverter.setJwtGrantedAuthoritiesConverter(grantedAuthoritiesConverter);
+        return jwtAuthenticationConverter;
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173", "http://localhost:8080"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(Arrays.asList("*"));
+        configuration.setAllowCredentials(true);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
+}
+
+4.3 CATALOG-SERVICE - Protección de endpoints:
+
+PÚBLICOS:
+- GET /api/catalog/branches/**
+- GET /api/catalog/items/**
+- /actuator/**
+- /swagger-ui/**, /v3/api-docs/**, /swagger-ui.html
+
+PROTEGIDOS:
+- /api/catalog/admin/** -> requiere ROLE_ADMIN
+- /api/catalog/provider/** -> requiere autenticación (luego @PreAuthorize valida ROLE_PROVIDER)
+- Cualquier otra ruta -> requiere autenticación
+
+4.4 BOOKING-SERVICE - application.properties COMPLETO:
+
+# Application
+spring.application.name=booking-service
+server.port=8082
+
+# Database
+spring.datasource.url=jdbc:postgresql://localhost:5433/domination_booking
+spring.datasource.username=domination
+spring.datasource.password=domination123
+spring.datasource.driver-class-name=org.postgresql.Driver
+
+# JPA/Hibernate
+spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+
+# OAuth2 Resource Server
+# Usa issuer-uri para descubrir automáticamente JWKS desde {issuer}/oauth2/jwks
+spring.security.oauth2.resourceserver.jwt.issuer-uri=${ISSUER_URI:http://auth-service:9000}
+# Alternativa si issuer-uri no funciona: usar jwk-set-uri directamente
+# spring.security.oauth2.resourceserver.jwt.jwk-set-uri=${JWK_SET_URI:http://auth-service:9000/oauth2/jwks}
+
+# Actuator
+management.endpoints.web.exposure.include=health,info
+management.endpoint.health.show-details=always
+
+# Logging
+logging.level.com.domination.booking=DEBUG
+logging.level.org.springframework.security=DEBUG
+logging.level.org.hibernate.SQL=DEBUG
+
+# SpringDoc OpenAPI
+springdoc.api-docs.path=/api-docs
+springdoc.swagger-ui.path=/swagger-ui.html
+
+# Catalog Service URL
+catalog.service.url=http://localhost:8081
+
+PROPIEDADES RELEVANTES:
+- spring.security.oauth2.resourceserver.jwt.issuer-uri=${ISSUER_URI:http://auth-service:9000}
+- ISSUER_URI está configurado en docker-compose.yml como: http://auth-service:9000
+- logging.level.org.springframework.security=DEBUG (debería mostrar errores de validación JWT)
+
+4.5 BOOKING-SERVICE - SecurityConfig.java (COMPLETO):
+
+package com.domination.booking.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.Arrays;
+
+@Configuration
+@EnableWebSecurity
+@EnableMethodSecurity
+public class SecurityConfig {
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+            .cors(cors -> cors.configure(http))
+            .csrf(csrf -> csrf.disable())
+            .sessionManagement(session -> 
+                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            )
+            .authorizeHttpRequests(auth -> auth
+                // Swagger & Actuator públicos
+                .requestMatchers("/actuator/**").permitAll()
+                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
+                
+                // Todos los endpoints de booking requieren JWT
+                .requestMatchers("/api/booking/**").authenticated()
+                
+                // Cualquier otra request requiere autenticación
+                .anyRequest().authenticated()
+            )
+            .oauth2ResourceServer(oauth2 -> oauth2
+                .jwt(jwt -> jwt
+                    .jwtAuthenticationConverter(jwtAuthenticationConverter())
+                )
+            );
+
+        return http.build();
+    }
+
+    @Bean
+    public JwtAuthenticationConverter jwtAuthenticationConverter() {
+        JwtGrantedAuthoritiesConverter grantedAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
+        grantedAuthoritiesConverter.setAuthoritiesClaimName("authorities");
+        grantedAuthoritiesConverter.setAuthorityPrefix("");
+        JwtAuthenticationConverter jwtAuthenticationConverter = new JwtAuthenticationConverter();
+        jwtAuthenticationConverter.setJwtGrantedAuthoritiesConverter(grantedAuthoritiesConverter);
+        return jwtAuthenticationConverter;
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173", "http://localhost:8080"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(Arrays.asList("*"));
+        configuration.setAllowCredentials(true);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
+}
+
+4.6 BOOKING-SERVICE - Protección de endpoints:
+
+PÚBLICOS:
+- /actuator/**
+- /swagger-ui/**, /v3/api-docs/**, /swagger-ui.html
+
+PROTEGIDOS:
+- /api/booking/** -> requiere autenticación (luego @PreAuthorize valida roles específicos)
+- Cualquier otra ruta -> requiere autenticación
+
+========================
+5) PRUEBAS / REPRODUCCIÓN
+========================
+
+COMANDOS DE PRUEBA (PowerShell):
+
+# 1. Login para obtener token
+$loginResponse = Invoke-RestMethod -Uri "http://localhost:9000/auth/login" `
+  -Method POST `
+  -ContentType "application/json" `
+  -Body '{"username":"adminSeba","password":"123456admin"}'
+$token = $loginResponse.token
+Write-Host "Token obtenido: $token"
+
+# 2. Decodificar JWT (manual o usando jwt.io)
+# El token debe tener claim "iss" = "http://auth-service:9000"
+# PROBLEMA REPORTADO: El JWT muestra "iss" = "http://localhost:8080"
+
+# 3. Probar endpoint protegido vía gateway
+$headers = @{
+    "Authorization" = "Bearer $token"
+    "Content-Type" = "application/json"
+}
+$response = Invoke-WebRequest -Uri "http://localhost:8080/api/catalog/provider/branches" `
+  -Method POST `
+  -Headers $headers `
+  -Body '{"name":"Test Branch","address":"Test Address"}' `
+  -ErrorAction SilentlyContinue
+Write-Host "Status: $($response.StatusCode)"
+Write-Host "Response: $($response.Content)"
+
+# 4. Verificar JWKS endpoint (desde host)
+curl -i http://localhost:9000/oauth2/jwks
+# RESULTADO ESPERADO: 200 OK con JSON de keys
+# RESULTADO REPORTADO: 404 Not Found
+
+# 5. Verificar OIDC Metadata (desde host)
+curl -i http://localhost:9000/.well-known/openid-configuration
+# RESULTADO ESPERADO: 200 OK con JSON de metadata
+# RESULTADO REPORTADO: 404 Not Found
+
+# 6. Verificar OAuth2 Metadata (desde host)
+curl -i http://localhost:9000/.well-known/oauth-authorization-server
+# RESULTADO ESPERADO: 200 OK con JSON de metadata
+# RESULTADO REPORTADO: 404 Not Found
+
+# 7. Verificar desde dentro del contenedor catalog-service
+docker exec domination-catalog-service wget -qO- http://auth-service:9000/oauth2/jwks
+# Debe devolver JSON con keys si el endpoint está disponible
+
+RESPUESTA DEL 401 (esperada):
+- Status: 401 Unauthorized
+- Header: WWW-Authenticate: Bearer error="invalid_token", error_description="..."
+- Body: {"error":"invalid_token","error_description":"..."}
+
+LOGS RELEVANTES ESPERADOS:
+
+auth-service (al arrancar):
+- "=== Spring Authorization Server Configurado ==="
+- "Issuer URI: http://auth-service:9000"
+- "Endpoints expuestos: ..."
+
+catalog-service (al validar token):
+- "JWT validation failed: invalid_token"
+- "Unable to resolve JWK Set from http://auth-service:9000/oauth2/jwks"
+- "Issuer validation failed: expected http://auth-service:9000, got http://localhost:8080"
+
+NOTA: Los logs reales NO están disponibles en este informe. Se requiere ejecutar los servicios y capturar los logs.
+
+========================
+6) DIAGNÓSTICO (máximo 5 hipótesis)
+========================
+
+HIPÓTESIS 1: Authorization Server NO está exponiendo endpoints automáticamente
+CAUSA: En Spring Boot 4.0, la auto-configuración del Authorization Server puede requerir configuración explícita.
+EVIDENCIA:
+- OAuth2AuthorizationServerConfig NO usa OAuth2AuthorizationServerConfiguration.applyDefaultSecurity(http)
+- Los endpoints /.well-known/* y /oauth2/jwks devuelven 404
+- Solo se configura securityMatcher con permitAll(), pero no se registran los endpoints
+VERIFICACIÓN:
+  docker exec domination-auth-service curl -i http://localhost:9000/oauth2/jwks
+  Resultado esperado: Si sigue dando 404, confirma que los endpoints NO están expuestos
+PROBABILIDAD: ALTA (90%)
+
+HIPÓTESIS 2: El issuer del JWT está hardcodeado o no se está leyendo correctamente
+CAUSA: Aunque OAuth2TokenService lee issuerUri de properties, puede haber otro lugar donde se genera el token con issuer incorrecto.
+EVIDENCIA:
+- JWT decodificado muestra "iss" = "http://localhost:8080" (incorrecto)
+- OAuth2TokenService usa issuerUri correctamente (línea 32)
+- Puede haber otro servicio/controller que genere tokens
+VERIFICACIÓN:
+  Buscar en el código todos los lugares donde se crea JwtClaimsSet o se genera token
+  Verificar logs de auth-service al hacer login para ver qué issuer se está usando
+PROBABILIDAD: MEDIA (60%)
+
+HIPÓTESIS 3: Resource Servers no pueden resolver JWKS porque el endpoint no existe
+CAUSA: Si /oauth2/jwks devuelve 404, los resource servers no pueden validar tokens aunque el issuer sea correcto.
+EVIDENCIA:
+- catalog-service y booking-service usan issuer-uri para descubrir JWKS
+- Si el endpoint no existe, la validación falla con "invalid_token"
+- Los 404 reportados confirman que los endpoints no están disponibles
+VERIFICACIÓN:
+  docker exec domination-catalog-service wget -qO- http://auth-service:9000/oauth2/jwks
+  Resultado esperado: Si da 404, confirma que el endpoint no está disponible desde dentro de Docker
+PROBABILIDAD: ALTA (85%)
+
+HIPÓTESIS 4: Mismatch de issuer entre token y configuración de resource servers
+CAUSA: El token tiene issuer "http://localhost:8080" pero los resource servers esperan "http://auth-service:9000".
+EVIDENCIA:
+- JWT tiene "iss" = "http://localhost:8080" (reportado)
+- catalog-service y booking-service configuran issuer-uri = "http://auth-service:9000"
+- Spring Security valida que el issuer del token coincida con issuer-uri
+VERIFICACIÓN:
+  Decodificar el JWT y verificar el claim "iss"
+  Comparar con la configuración de issuer-uri en catalog/booking services
+PROBABILIDAD: ALTA (95%)
+
+HIPÓTESIS 5: Problema de red Docker o resolución DNS
+CAUSA: Los servicios dentro de Docker no pueden comunicarse correctamente usando los nombres de servicio.
+EVIDENCIA:
+- Los servicios usan nombres Docker (auth-service:9000) para comunicación interna
+- Puede haber problemas de red o DNS que impidan la resolución
+- Los 404 pueden ser por timeout o problemas de conectividad
+VERIFICACIÓN:
+  docker exec domination-catalog-service ping -c 3 auth-service
+  docker exec domination-catalog-service nslookup auth-service
+  Resultado esperado: Si ping/nslookup fallan, confirma problemas de red
+PROBABILIDAD: BAJA (20%)
+
+CAUSA MÁS PROBABLE:
+HIPÓTESIS 4 + HIPÓTESIS 1 combinadas:
+- El Authorization Server NO está exponiendo los endpoints (404 en /oauth2/jwks)
+- El token tiene issuer incorrecto ("http://localhost:8080" en lugar de "http://auth-service:9000")
+- Los resource servers intentan validar el token pero:
+  a) No pueden obtener JWKS (endpoint no existe)
+  b) El issuer no coincide (validación falla)
+
+SOLUCIÓN SUGERIDA:
+1. Habilitar explícitamente los endpoints del Authorization Server en OAuth2AuthorizationServerConfig
+2. Verificar y corregir el issuer del token generado en OAuth2TokenService
+3. Asegurar que los endpoints /.well-known/* y /oauth2/jwks estén disponibles
+
+========================
+7) FALTANTES
+========================
+
+1. Output completo de "mvn dependency:tree" filtrado por oauth2/security para:
+   - auth-service
+   - catalog-service
+   - booking-service
+   (Los comandos ejecutados no devolvieron salida)
+
+2. Logs reales de:
+   - auth-service al arrancar (especialmente los logs de "Spring Authorization Server Configurado")
+   - catalog-service cuando recibe un request con token (errores de validación JWT)
+   - booking-service cuando recibe un request con token (errores de validación JWT)
+
+3. Respuesta completa del 401 (headers + body) cuando se llama a un endpoint protegido
+
+4. JWT decodificado completo (todos los claims) para verificar:
+   - issuer exacto
+   - authorities
+   - exp, iat
+   - otros claims
+
+5. Verificación de conectividad Docker:
+   - ping desde catalog-service a auth-service
+   - nslookup de auth-service desde catalog-service
+   - wget/curl desde catalog-service a auth-service:9000/oauth2/jwks
+
+6. Verificación de que el Authorization Server está realmente activo:
+   - Verificar que los beans (RegisteredClientRepository, JWKSource, AuthorizationServerSettings) están siendo creados
+   - Verificar que Spring Boot auto-configuración está activa para OAuth2 Authorization Server
+
+7. Verificación del valor real de ISSUER_URI dentro del contenedor:
+   - docker exec domination-auth-service printenv | grep ISSUER
+   - docker exec domination-catalog-service printenv | grep ISSUER
+
+FIN DEL INFORME
+

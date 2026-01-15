@@ -251,15 +251,16 @@ public class ProviderController {
     }
     
     private Long extractProviderId(Jwt jwt) {
-        Object providerIdClaim = jwt.getClaim("providerId");
-        if (providerIdClaim == null) {
-            throw new IllegalStateException("providerId no encontrado en JWT. Asegúrate de registrarte como provider.");
+        Object userIdClaim = jwt.getClaim("userId");
+        if (userIdClaim == null) {
+            throw new IllegalStateException("userId no encontrado en JWT");
         }
+        // El providerId ES el userId del usuario con rol PROVIDER
         // Convertir a Long (puede venir como Integer o Long dependiendo del JSON)
-        if (providerIdClaim instanceof Integer) {
-            return ((Integer) providerIdClaim).longValue();
+        if (userIdClaim instanceof Integer) {
+            return ((Integer) userIdClaim).longValue();
         }
-        return (Long) providerIdClaim;
+        return (Long) userIdClaim;
     }
 }
 ```

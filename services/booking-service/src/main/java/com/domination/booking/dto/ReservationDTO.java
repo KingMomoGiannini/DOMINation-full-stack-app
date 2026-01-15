@@ -16,6 +16,7 @@ public class ReservationDTO {
     private Long id;
     private String customerId;
     private Long branchId;
+    private Long providerId;
     private LocalDateTime startAt;
     private LocalDateTime endAt;
     private ReservationStatus status;

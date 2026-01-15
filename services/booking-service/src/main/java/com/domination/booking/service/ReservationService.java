@@ -38,6 +38,15 @@ public class ReservationService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public List<ReservationDTO> getProviderReservations(Long providerId) {
+        log.debug("Obteniendo reservas del provider: {}", providerId);
+        
+        return reservationRepository.findByProviderId(providerId).stream()
+                .map(reservationMapper::toDTO)
+                .collect(Collectors.toList());
+    }
+
     @Transactional
     public ReservationDTO createReservation(CreateReservationRequest request, String customerId) {
         log.info("Creando reserva para cliente {} en sucursal {}", customerId, request.getBranchId());
@@ -47,10 +56,17 @@ public class ReservationService {
             throw new IllegalArgumentException("La fecha de inicio debe ser anterior a la fecha de fin");
         }
 
+        // Obtener providerId del branch
+        var branchDetail = catalogClient.getBranchDetail(request.getBranchId());
+        Long providerId = branchDetail.getProviderId();
+        
+        log.debug("Branch {} pertenece al provider {}", request.getBranchId(), providerId);
+
         // Crear la reserva
         Reservation reservation = Reservation.builder()
                 .customerId(customerId)
                 .branchId(request.getBranchId())
+                .providerId(providerId)
                 .startAt(request.getStartAt())
                 .endAt(request.getEndAt())
                 .status(ReservationStatus.PENDING)

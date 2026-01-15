@@ -29,6 +29,7 @@ public class DataSeeder implements CommandLineRunner {
     public void run(String... args) {
         seedRoles();
         seedAdminUser();
+        seedProviderUser();
     }
 
     /**
@@ -57,6 +58,17 @@ public class DataSeeder implements CommandLineRunner {
             log.info("✅ Rol ROLE_USER creado");
         } else {
             log.info("ℹ️ Rol ROLE_USER ya existe");
+        }
+
+        // Crear ROLE_PROVIDER
+        if (roleRepository.findByName(RoleName.ROLE_PROVIDER).isEmpty()) {
+            Role providerRole = Role.builder()
+                    .name(RoleName.ROLE_PROVIDER)
+                    .build();
+            roleRepository.save(providerRole);
+            log.info("✅ Rol ROLE_PROVIDER creado");
+        } else {
+            log.info("ℹ️ Rol ROLE_PROVIDER ya existe");
         }
     }
 
@@ -93,6 +105,43 @@ public class DataSeeder implements CommandLineRunner {
             log.info("   ⚠️ IMPORTANTE: Cambia esta contraseña en producción");
         } else {
             log.info("ℹ️ Usuario administrador '{}' ya existe", adminUsername);
+        }
+    }
+
+    /**
+     * Crea el usuario provider demo si no existe
+     */
+    private void seedProviderUser() {
+        log.info("🌱 Verificando usuario provider demo...");
+
+        String providerUsername = "providerDemo";
+        String providerPassword = "provider123";
+        String providerEmail = "provider@domination.com";
+
+        if (userRepository.findByUsername(providerUsername).isEmpty()) {
+            Role providerRole = roleRepository.findByName(RoleName.ROLE_PROVIDER)
+                    .orElseThrow(() -> new IllegalStateException("ROLE_PROVIDER no está configurado en la base"));
+
+            Role userRole = roleRepository.findByName(RoleName.ROLE_USER)
+                    .orElseThrow(() -> new IllegalStateException("ROLE_USER no está configurado en la base"));
+
+            User providerUser = User.builder()
+                    .username(providerUsername)
+                    .email(providerEmail)
+                    .password(passwordEncoder.encode(providerPassword))
+                    .enabled(true)
+                    .roles(Set.of(providerRole, userRole))
+                    .build();
+
+            userRepository.save(providerUser);
+            log.info("✅ Usuario provider demo creado:");
+            log.info("   👤 Username: {}", providerUsername);
+            log.info("   📧 Email: {}", providerEmail);
+            log.info("   🔑 Password: {}", providerPassword);
+            log.info("   🎭 Roles: ROLE_PROVIDER, ROLE_USER");
+            log.info("   ⚠️ IMPORTANTE: Solo para desarrollo");
+        } else {
+            log.info("ℹ️ Usuario provider '{}' ya existe", providerUsername);
         }
     }
 }

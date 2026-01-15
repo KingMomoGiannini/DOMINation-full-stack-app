@@ -20,6 +20,7 @@ public class ReservationMapper {
                 .id(reservation.getId())
                 .customerId(reservation.getCustomerId())
                 .branchId(reservation.getBranchId())
+                .providerId(reservation.getProviderId())
                 .startAt(reservation.getStartAt())
                 .endAt(reservation.getEndAt())
                 .status(reservation.getStatus())

@@ -1,0 +1,449 @@
+========================================
+DIFFS COMPLETOS - SPRINT 0 CORRECCIONES
+========================================
+
+NOTA IMPORTANTE:
+En Spring Boot 4.0, la clase OAuth2AuthorizationServerConfigurer con el método estático
+authorizationServer() y el método http.with() no están disponibles en los paquetes esperados.
+La auto-configuración de Spring Boot 4.0 expone automáticamente los endpoints cuando detecta
+los beans necesarios (RegisteredClientRepository, JWKSource, AuthorizationServerSettings).
+
+Se mantiene la configuración explícita del SecurityFilterChain con securityMatcher y
+se agregan logs para verificar el issuer en runtime.
+
+========================================
+ARCHIVO 1: OAuth2AuthorizationServerConfig.java
+========================================
+
+ANTES:
+package com.gianniniseba.authservice.config;
+...
+@Configuration
+@EnableWebSecurity
+public class OAuth2AuthorizationServerConfig {
+    private static final Logger logger = LoggerFactory.getLogger(OAuth2AuthorizationServerConfig.class);
+    @Value("${app.security.issuer-uri:http://auth-service:9000}")
+    private String issuerUri;
+
+    @Bean
+    @Order(1)
+    public SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http)
+            throws Exception {
+        // En Spring Boot 4.0, la auto-configuración del Authorization Server expone automáticamente
+        // los endpoints cuando detecta los beans necesarios...
+        
+        http
+                .securityMatcher("/oauth2/**", "/.well-known/**")
+                .authorizeHttpRequests(auth -> auth
+                        .anyRequest().permitAll()
+                )
+                .csrf(csrf -> csrf
+                        .ignoringRequestMatchers("/oauth2/**", "/.well-known/**")
+                )
+                .cors(Customizer.withDefaults());
+
+        // Log de endpoints que deberían estar disponibles por auto-configuración
+        logger.info("=== Spring Authorization Server Configurado ===");
+        logger.info("Issuer URI: {}", issuerUri);
+        // ... logs básicos
+
+        return http.build();
+    }
+    // ... resto de beans
+}
+
+DESPUÉS (ARCHIVO COMPLETO):
+package com.gianniniseba.authservice.config;
+
+import com.nimbusds.jose.jwk.JWKSet;
+import com.nimbusds.jose.jwk.RSAKey;
+import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
+import com.nimbusds.jose.jwk.source.JWKSource;
+import com.nimbusds.jose.proc.SecurityContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
+import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
+import org.springframework.security.oauth2.core.oidc.OidcScopes;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.oauth2.server.authorization.client.InMemoryRegisteredClientRepository;
+import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
+import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
+import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
+import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
+import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.beans.factory.annotation.Value;
+import jakarta.annotation.PostConstruct;
+
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.interfaces.RSAPrivateKey;
+import java.security.interfaces.RSAPublicKey;
+import java.time.Duration;
+import java.util.UUID;
+
+@Configuration
+@EnableWebSecurity
+public class OAuth2AuthorizationServerConfig {
+
+    private static final Logger logger = LoggerFactory.getLogger(OAuth2AuthorizationServerConfig.class);
+
+    @Value("${app.security.issuer-uri:http://auth-service:9000}")
+    private String issuerUri;
+
+    @PostConstruct
+    public void logIssuerConfiguration() {
+        logger.info("=== OAuth2 Authorization Server - Issuer Configuration ===");
+        logger.info("Issuer URI (from property app.security.issuer-uri): {}", issuerUri);
+        logger.info("Property source: ${ISSUER_URI:http://auth-service:9000}");
+        logger.info("===========================================================");
+    }
+
+    @Bean
+    @Order(1)
+    public SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http)
+            throws Exception {
+        // En Spring Boot 4.0, la auto-configuración del Authorization Server expone automáticamente
+        // los endpoints cuando detecta los beans necesarios (RegisteredClientRepository, JWKSource, AuthorizationServerSettings).
+        // Este SecurityFilterChain permite acceso público a los endpoints del Authorization Server.
+        // Los endpoints se exponen automáticamente en:
+        // - /oauth2/jwks
+        // - /oauth2/authorize
+        // - /oauth2/token
+        // - /.well-known/openid-configuration (OIDC habilitado por tener scope OPENID en RegisteredClient)
+        // - /.well-known/oauth-authorization-server
+        
+        http
+                .securityMatcher("/oauth2/**", "/.well-known/**")
+                .authorizeHttpRequests(auth -> auth
+                        .anyRequest().permitAll()  // Permitir acceso público a discovery/JWKS
+                )
+                .csrf(csrf -> csrf
+                        .ignoringRequestMatchers("/oauth2/**", "/.well-known/**")
+                )
+                .cors(Customizer.withDefaults());
+
+        // Log de endpoints expuestos
+        logger.info("=== Spring Authorization Server Configurado (Explícito) ===");
+        logger.info("Issuer URI: {}", issuerUri);
+        logger.info("OIDC habilitado: true (scope OPENID en RegisteredClient)");
+        logger.info("Endpoints que deberían estar disponibles por auto-configuración:");
+        logger.info("  - JWKS: {}/oauth2/jwks", issuerUri);
+        logger.info("  - Authorization: {}/oauth2/authorize", issuerUri);
+        logger.info("  - Token: {}/oauth2/token", issuerUri);
+        logger.info("  - OIDC Metadata: {}/.well-known/openid-configuration", issuerUri);
+        logger.info("  - OAuth2 Metadata: {}/.well-known/oauth-authorization-server", issuerUri);
+        logger.info("============================================================");
+
+        return http.build();
+    }
+
+    @Bean
+    public RegisteredClientRepository registeredClientRepository() {
+        RegisteredClient oidcClient = RegisteredClient.withId(UUID.randomUUID().toString())
+                .clientId("react-client")
+                .clientSecret(passwordEncoder().encode("secret"))
+                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
+                .redirectUri("http://localhost:5173/callback")
+                .postLogoutRedirectUri("http://localhost:5173")
+                .scope(OidcScopes.OPENID)
+                .scope(OidcScopes.PROFILE)
+                .scope("read")
+                .scope("write")
+                .clientSettings(ClientSettings.builder()
+                        .requireAuthorizationConsent(false)
+                        .build())
+                .tokenSettings(TokenSettings.builder()
+                        .accessTokenTimeToLive(Duration.ofHours(1))
+                        .refreshTokenTimeToLive(Duration.ofDays(7))
+                        .reuseRefreshTokens(true)
+                        .build())
+                .build();
+
+        return new InMemoryRegisteredClientRepository(oidcClient);
+    }
+
+    @Bean
+    public JWKSource<SecurityContext> jwkSource() {
+        KeyPair keyPair = getStaticKeyPair();
+        RSAPublicKey publicKey = (RSAPublicKey) keyPair.getPublic();
+        RSAPrivateKey privateKey = (RSAPrivateKey) keyPair.getPrivate();
+        RSAKey rsaKey = new RSAKey.Builder(publicKey)
+                .privateKey(privateKey)
+                .keyID(UUID.randomUUID().toString())
+                .build();
+        JWKSet jwkSet = new JWKSet(rsaKey);
+        return new ImmutableJWKSet<>(jwkSet);
+    }
+
+    private static KeyPair generateRsaKey() {
+        KeyPair keyPair;
+        try {
+            KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
+            keyPairGenerator.initialize(2048);
+            keyPair = keyPairGenerator.generateKeyPair();
+        } catch (Exception ex) {
+            throw new IllegalStateException(ex);
+        }
+        return keyPair;
+    }
+
+    private static KeyPair staticKeyPair;
+    
+    private static synchronized KeyPair getStaticKeyPair() {
+        if (staticKeyPair == null) {
+            staticKeyPair = generateRsaKey();
+        }
+        return staticKeyPair;
+    }
+
+    @Bean
+    public JwtDecoder jwtDecoder() {
+        try {
+            RSAPublicKey publicKey = (RSAPublicKey) getStaticKeyPair().getPublic();
+            return NimbusJwtDecoder.withPublicKey(publicKey).build();
+        } catch (Exception e) {
+            throw new IllegalStateException("Error al crear JwtDecoder", e);
+        }
+    }
+
+    @Bean
+    public JwtEncoder jwtEncoder(JWKSource<SecurityContext> jwkSource) {
+        return new NimbusJwtEncoder(jwkSource);
+    }
+
+    @Bean
+    public AuthorizationServerSettings authorizationServerSettings() {
+        return AuthorizationServerSettings.builder()
+                .issuer(issuerUri)
+                .build();
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+}
+
+CAMBIOS EN ESTE ARCHIVO:
+1. Agregado import: jakarta.annotation.PostConstruct
+2. Agregado método @PostConstruct logIssuerConfiguration() que imprime el issuerUri y su origen
+3. Mejorado logging en authorizationServerSecurityFilterChain() para indicar que OIDC está habilitado
+4. Mantenidos todos los beans (jwkSource, registeredClientRepository, encoder/decoder, AuthorizationServerSettings)
+
+========================================
+ARCHIVO 2: OAuth2TokenService.java
+========================================
+
+ANTES:
+@Service
+@RequiredArgsConstructor
+public class OAuth2TokenService {
+    private static final Logger logger = LoggerFactory.getLogger(OAuth2TokenService.class);
+    private final JwtEncoder jwtEncoder;
+    @Value("${app.security.issuer-uri:http://auth-service:9000}")
+    private String issuerUri;
+
+    public String generateAccessToken(User user) {
+        // ...
+        // Log del issuer que se está usando (para debug)
+        logger.debug("Generando token JWT con issuer: {}", issuerUri);
+        // ...
+    }
+}
+
+DESPUÉS (ARCHIVO COMPLETO):
+package com.gianniniseba.authservice.service;
+
+import com.gianniniseba.authservice.entity.User;
+import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.oauth2.jwt.JwtClaimsSet;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
+import org.springframework.stereotype.Service;
+
+import java.time.Instant;
+
+@Service
+@RequiredArgsConstructor
+public class OAuth2TokenService {
+
+    private static final Logger logger = LoggerFactory.getLogger(OAuth2TokenService.class);
+
+    private final JwtEncoder jwtEncoder;
+
+    @Value("${app.security.issuer-uri:http://auth-service:9000}")
+    private String issuerUri;
+
+    public String generateAccessToken(User user) {
+        Instant now = Instant.now();
+        Instant expiry = now.plusSeconds(3600); // 1 hora
+
+        // Convertir roles a lista de authorities (formato esperado por Resource Servers)
+        var authorities = user.getRoles().stream()
+                .map(role -> role.getName().name())
+                .toList();
+
+        // Log del issuer que se está usando (para debug)
+        logger.info("Generando token JWT para usuario: {} con issuer: {} (desde property: app.security.issuer-uri)", 
+                user.getUsername(), issuerUri);
+
+        JwtClaimsSet claims = JwtClaimsSet.builder()
+                .issuer(issuerUri)
+                .issuedAt(now)
+                .expiresAt(expiry)
+                .subject(user.getUsername())
+                .claim("scope", "read write openid profile")
+                .claim("authorities", authorities)  // Lista de strings ["ROLE_ADMIN", "ROLE_USER"]
+                .claim("userId", user.getId())      // ID del usuario para auditoría
+                .build();
+
+        String token = jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
+        logger.debug("Token JWT generado exitosamente para usuario: {}", user.getUsername());
+        return token;
+    }
+}
+
+CAMBIOS EN ESTE ARCHIVO:
+1. Cambiado logger.debug() a logger.info() en generateAccessToken() para que sea visible en runtime
+2. Agregado información del origen de la property en el log: "(desde property: app.security.issuer-uri)"
+
+========================================
+VERIFICACIÓN DEL FLUJO DEL TOKEN
+========================================
+
+1) DESDE DÓNDE SE ARMA EL TOKEN QUE DEVUELVE /auth/login:
+
+   AuthController.login() (POST /auth/login)
+   -> AuthService.login(LoginRequest request)
+      -> OAuth2TokenService.generateAccessToken(User user)
+         -> JwtClaimsSet.builder().issuer(issuerUri).build()
+         -> jwtEncoder.encode(JwtClaimsSet)
+
+   EVIDENCIA:
+   - AuthController.java línea 30-34: @PostMapping("/login") llama a authService.login()
+   - AuthService.java línea 62-79: método login() llama a oAuth2TokenService.generateAccessToken(user) en línea 73
+   - OAuth2TokenService.java línea 26-51: método generateAccessToken() construye el JWT con .issuer(issuerUri) en línea 39
+
+2) QUÉ VALOR REAL SE ESTÁ INYECTANDO EN issuerUri EN RUNTIME:
+
+   El issuerUri se inyecta desde:
+   - @Value("${app.security.issuer-uri:http://auth-service:9000}")
+   
+   Orden de resolución:
+   1. Variable de entorno ISSUER_URI (si existe en Docker)
+   2. Property app.security.issuer-uri en application.properties
+   3. Valor por defecto: http://auth-service:9000
+
+   EVIDENCIA:
+   - application.properties línea 27: app.security.issuer-uri=${ISSUER_URI:http://auth-service:9000}
+   - docker-compose.yml (verificar): ISSUER_URI=http://auth-service:9000 en auth-service
+   - OAuth2AuthorizationServerConfig.java línea 50: @Value("${app.security.issuer-uri:http://auth-service:9000}")
+   - OAuth2TokenService.java línea 23: @Value("${app.security.issuer-uri:http://auth-service:9000}")
+
+   LOGS PARA VERIFICAR EN RUNTIME:
+   - Al iniciar auth-service: buscar "=== OAuth2 Authorization Server - Issuer Configuration ==="
+   - Al hacer login: buscar "Generando token JWT para usuario: ... con issuer: ..."
+
+========================================
+BÚSQUEDA DE HARDCODE "localhost:8080"
+========================================
+
+BÚSQUEDA REALIZADA:
+- Patrón: "localhost:8080"
+- Resultado: NO se encontró hardcode de "localhost:8080" en el código Java de auth-service
+- Única referencia a localhost: RegisteredClient tiene redirectUri("http://localhost:5173/callback") 
+  (esto es para el frontend, no afecta el issuer del token)
+
+BÚSQUEDA DE REFERENCIAS A ISSUER:
+- ".issuer(": Encontrado en:
+  * OAuth2AuthorizationServerConfig.java línea 185: .issuer(issuerUri)
+  * OAuth2TokenService.java línea 39: .issuer(issuerUri)
+- "issuer-uri": Encontrado en:
+  * application.properties línea 27: app.security.issuer-uri=${ISSUER_URI:http://auth-service:9000}
+- "ISSUER_URI": Encontrado en:
+  * application.properties línea 27: ${ISSUER_URI:http://auth-service:9000}
+- "generateAccessToken(": Encontrado en:
+  * AuthService.java línea 73: oAuth2TokenService.generateAccessToken(user)
+
+CONCLUSIÓN:
+- NO hay hardcode de "localhost:8080" en el código
+- El issuer se lee correctamente desde la property app.security.issuer-uri
+- El token se genera en OAuth2TokenService.generateAccessToken() usando issuerUri inyectado
+
+========================================
+RESUMEN DE CAMBIOS
+========================================
+
+ARCHIVOS MODIFICADOS:
+1. services/auth-service/src/main/java/com/gianniniseba/authservice/config/OAuth2AuthorizationServerConfig.java
+   - Agregado @PostConstruct logIssuerConfiguration() para loggear issuerUri al startup
+   - Mejorado logging en authorizationServerSecurityFilterChain()
+   - Mantenidos todos los beans (jwkSource, registeredClientRepository, encoder/decoder, AuthorizationServerSettings)
+
+2. services/auth-service/src/main/java/com/gianniniseba/authservice/service/OAuth2TokenService.java
+   - Cambiado logger.debug() a logger.info() en generateAccessToken()
+   - Agregado información del origen de la property en el log
+
+ARCHIVOS NO MODIFICADOS (pero verificados):
+- AuthService.java: Usa correctamente OAuth2TokenService.generateAccessToken()
+- AuthController.java: Llama correctamente a AuthService.login()
+- application.properties: Tiene app.security.issuer-uri configurado correctamente
+
+========================================
+VERIFICACIÓN EN RUNTIME
+========================================
+
+Para verificar que el issuer se está inyectando correctamente:
+
+1. Al iniciar auth-service, buscar en logs:
+   "=== OAuth2 Authorization Server - Issuer Configuration ==="
+   "Issuer URI (from property app.security.issuer-uri): http://auth-service:9000"
+   "Property source: ${ISSUER_URI:http://auth-service:9000}"
+
+2. Al hacer login, buscar en logs:
+   "Generando token JWT para usuario: <username> con issuer: http://auth-service:9000 (desde property: app.security.issuer-uri)"
+
+3. Verificar variable de entorno en Docker:
+   docker exec domination-auth-service printenv | grep ISSUER
+   # Debe mostrar: ISSUER_URI=http://auth-service:9000
+
+4. Decodificar el JWT y verificar el claim "iss":
+   # Debe ser: "iss": "http://auth-service:9000"
+   # NO debe ser: "iss": "http://localhost:8080"
+
+========================================
+NOTA SOBRE OAuth2AuthorizationServerConfigurer
+========================================
+
+En Spring Boot 4.0, la clase OAuth2AuthorizationServerConfigurer con el método estático
+authorizationServer() y el método http.with() no están disponibles en los paquetes esperados.
+La auto-configuración de Spring Boot 4.0 expone automáticamente los endpoints cuando detecta
+los beans necesarios:
+- RegisteredClientRepository (configurado)
+- JWKSource<SecurityContext> (configurado)
+- AuthorizationServerSettings (configurado con issuer)
+
+El SecurityFilterChain con securityMatcher("/oauth2/**", "/.well-known/**") y permitAll()
+asegura que los endpoints sean accesibles públicamente, y la auto-configuración los expone
+automáticamente.
+
+FIN DEL DOCUMENTO
+

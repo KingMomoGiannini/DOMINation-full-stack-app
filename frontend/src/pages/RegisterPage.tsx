@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { register, RegisterRequest } from '../api/apiClient';
+import { register, RegisterRequest, login } from '../api/apiClient';
 import { useAuth } from '../context/AuthContext';
 
 export default function RegisterPage() {
@@ -11,6 +11,7 @@ export default function RegisterPage() {
     username: '',
     password: '',
     email: '',
+    roleType: 'USER',
   });
   
   const [loading, setLoading] = useState(false);
@@ -41,8 +42,12 @@ export default function RegisterPage() {
     setError(null);
 
     try {
-      const response = await register(formData);
-      authLogin(response.token, formData.username);
+      await register(formData);
+      const loginResponse = await login({ 
+        username: formData.username, 
+        password: formData.password 
+      });
+      authLogin(loginResponse.token, formData.username);
       navigate('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al registrarse');
@@ -55,7 +60,7 @@ export default function RegisterPage() {
     <div className="main-content">
       <div className="form-container">
         <div className="form-header">
-          <h2>Crear Cuenta</h2>
+          <h2>Registrate</h2>
           <p>Únete a DOMINation y comienza a reservar</p>
         </div>
 

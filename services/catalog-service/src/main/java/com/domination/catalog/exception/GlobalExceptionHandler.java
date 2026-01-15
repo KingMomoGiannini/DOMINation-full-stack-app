@@ -2,9 +2,11 @@ package com.domination.catalog.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.NoHandlerFoundException;
 
 import java.time.Instant;
 import java.util.HashMap;
@@ -38,6 +40,28 @@ public class GlobalExceptionHandler {
         problemDetail.setTitle("Datos inválidos");
         problemDetail.setProperty("timestamp", Instant.now());
         problemDetail.setProperty("errors", errors);
+        return problemDetail;
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ProblemDetail handleAccessDenied(AccessDeniedException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
+                HttpStatus.FORBIDDEN,
+                ex.getMessage() != null ? ex.getMessage() : "Acceso denegado"
+        );
+        problemDetail.setTitle("Acceso denegado");
+        problemDetail.setProperty("timestamp", Instant.now());
+        return problemDetail;
+    }
+
+    @ExceptionHandler(NoHandlerFoundException.class)
+    public ProblemDetail handleNoHandlerFound(NoHandlerFoundException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
+                HttpStatus.NOT_FOUND,
+                "Ruta no encontrada: " + ex.getRequestURL()
+        );
+        problemDetail.setTitle("Ruta no encontrada");
+        problemDetail.setProperty("timestamp", Instant.now());
         return problemDetail;
     }
 

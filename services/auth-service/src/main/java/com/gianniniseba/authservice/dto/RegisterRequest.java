@@ -24,4 +24,6 @@ public class RegisterRequest {
     @Size(min =6, max = 100)
     private String password;
 
+    private String roleType;
+
 }

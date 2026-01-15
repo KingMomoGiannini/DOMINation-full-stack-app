@@ -15,6 +15,8 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     
     List<Reservation> findByCustomerId(String customerId);
     
+    List<Reservation> findByProviderId(Long providerId);
+    
     /**
      * Encuentra reservas que se solapan con el rango de tiempo dado para un item específico
      * Excluye reservas canceladas

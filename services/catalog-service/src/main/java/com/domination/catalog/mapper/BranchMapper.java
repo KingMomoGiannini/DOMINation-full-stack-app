@@ -17,6 +17,7 @@ public class BranchMapper {
                 .name(branch.getName())
                 .address(branch.getAddress())
                 .active(branch.getActive())
+                .providerId(branch.getProviderId())
                 .build();
     }
 
@@ -30,6 +31,7 @@ public class BranchMapper {
                 .name(dto.getName())
                 .address(dto.getAddress())
                 .active(dto.getActive())
+                .providerId(dto.getProviderId())
                 .build();
     }
 }

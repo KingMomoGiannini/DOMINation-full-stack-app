@@ -12,5 +12,6 @@ public class BranchDTO {
     private String name;
     private String address;
     private Boolean active;
+    private Long providerId;
 }
 

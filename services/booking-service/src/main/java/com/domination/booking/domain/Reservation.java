@@ -32,6 +32,13 @@ public class Reservation {
     @Column(name = "branch_id", nullable = false)
     private Long branchId;
 
+    /**
+     * ID del provider dueño del branch (igual a userId del provider)
+     * Se obtiene del branch al crear la reserva
+     */
+    @Column(name = "provider_id")
+    private Long providerId;
+
     @NotNull(message = "La fecha de inicio es obligatoria")
     @Column(name = "start_at", nullable = false)
     private LocalDateTime startAt;

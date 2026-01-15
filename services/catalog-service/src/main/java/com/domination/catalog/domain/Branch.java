@@ -30,6 +30,13 @@ public class Branch {
 
     @Column(nullable = false)
     private Boolean active = true;
+
+    /**
+     * ID del usuario provider que creó y gestiona esta sucursal
+     * Corresponde al userId del JWT del prestador
+     */
+    @Column(name = "provider_id")
+    private Long providerId;
 }
 
 

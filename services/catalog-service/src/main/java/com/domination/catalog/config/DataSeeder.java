@@ -32,11 +32,12 @@ public class DataSeeder implements CommandLineRunner {
 
         log.info("Iniciando seed de datos...");
 
-        // Crear sucursales
+        // Crear sucursales (asignadas al providerDemo con userId=2)
         Branch branch1 = Branch.builder()
                 .name("DOMINation Buenos Aires Centro")
                 .address("Av. Corrientes 1234, CABA")
                 .active(true)
+                .providerId(2L)  // providerDemo
                 .build();
         branch1 = branchRepository.save(branch1);
 
@@ -44,6 +45,7 @@ public class DataSeeder implements CommandLineRunner {
                 .name("DOMINation Belgrano")
                 .address("Av. Cabildo 5678, CABA")
                 .active(true)
+                .providerId(2L)  // providerDemo
                 .build();
         branch2 = branchRepository.save(branch2);
 

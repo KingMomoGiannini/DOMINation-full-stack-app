@@ -4,10 +4,13 @@ import Home from './pages/Home';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import CreateReservationPage from './pages/CreateReservationPage';
+import ProviderDashboard from './pages/ProviderDashboard';
+import ProviderRequestPage from './pages/ProviderRequestPage';
+import AdminProviderRequestsPage from './pages/AdminProviderRequestsPage';
 import './App.css';
 
 function Navigation() {
-  const { isAuthenticated, username, logout } = useAuth();
+  const { isAuthenticated, username, hasRole, logout } = useAuth();
 
   return (
     <nav className="navbar">
@@ -20,6 +23,9 @@ function Navigation() {
           {isAuthenticated ? (
             <>
               <Link to="/reservations/new">Crear Reserva</Link>
+              {hasRole('PROVIDER') && <Link to="/provider">Mi Panel</Link>}
+              {hasRole('ADMIN') && <Link to="/admin/provider-requests">Solicitudes Prestador</Link>}
+              {!hasRole('ADMIN') && !hasRole('PROVIDER') && <Link to="/provider-request">Ser Prestador</Link>}
               <div className="user-info">
                 <span>👤 {username}</span>
                 <button onClick={logout} className="btn-logout">
@@ -47,6 +53,9 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/reservations/new" element={<CreateReservationPage />} />
+            <Route path="/provider" element={<ProviderDashboard />} />
+            <Route path="/provider-request" element={<ProviderRequestPage />} />
+            <Route path="/admin/provider-requests" element={<AdminProviderRequestsPage />} />
           </Routes>
         </div>
       </BrowserRouter>

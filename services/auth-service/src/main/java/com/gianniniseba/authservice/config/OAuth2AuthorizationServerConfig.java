@@ -5,6 +5,8 @@ import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -23,10 +25,14 @@ import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.authorization.client.InMemoryRegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
+import org.springframework.security.config.annotation.web.configurers.oauth2.server.authorization.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.util.matcher.RequestMatcher;
+import org.springframework.beans.factory.annotation.Value;
+import jakarta.annotation.PostConstruct;
 
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -39,21 +45,38 @@ import java.util.UUID;
 @EnableWebSecurity
 public class OAuth2AuthorizationServerConfig {
 
+    private static final Logger logger = LoggerFactory.getLogger(OAuth2AuthorizationServerConfig.class);
+
+    @Value("${app.security.issuer-uri:http://auth-service:9000}")
+    private String issuerUri;
+
+    @PostConstruct
+    public void logIssuerConfiguration() {
+        logger.info("=== OAuth2 Authorization Server - Issuer Configuration ===");
+        logger.info("Issuer URI (from property app.security.issuer-uri): {}", issuerUri);
+        logger.info("Property source: ${ISSUER_URI:http://auth-service:9000}");
+        logger.info("===========================================================");
+    }
+
     @Bean
     @Order(1)
-    public SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http)
-            throws Exception {
+    public SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http) throws Exception {
+
+        OAuth2AuthorizationServerConfigurer as = new OAuth2AuthorizationServerConfigurer();
+        RequestMatcher endpoints = as.getEndpointsMatcher();
+
         http
-                .securityMatcher("/oauth2/**", "/.well-known/**")
-                .authorizeHttpRequests(auth -> auth
-                        .anyRequest().permitAll()
-                )
-                .csrf(csrf -> csrf.disable())
-                .oauth2ResourceServer((resourceServer) -> resourceServer
-                        .jwt(Customizer.withDefaults()));
+            .securityMatcher(endpoints)
+            .csrf(csrf -> csrf.ignoringRequestMatchers(endpoints))
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/.well-known/**", "/oauth2/jwks").permitAll()
+                .anyRequest().authenticated()
+            )
+            .with(as, authServer -> authServer.oidc(Customizer.withDefaults()));
 
         return http.build();
     }
+
 
     @Bean
     public RegisteredClientRepository registeredClientRepository() {
@@ -134,7 +157,7 @@ public class OAuth2AuthorizationServerConfig {
     @Bean
     public AuthorizationServerSettings authorizationServerSettings() {
         return AuthorizationServerSettings.builder()
-                .issuer("http://localhost:8080")
+                .issuer(issuerUri)
                 .build();
     }
 

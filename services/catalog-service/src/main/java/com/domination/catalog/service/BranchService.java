@@ -8,6 +8,7 @@ import com.domination.catalog.mapper.BranchMapper;
 import com.domination.catalog.repository.BranchRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -52,6 +53,95 @@ public class BranchService {
         log.info("Sucursal creada con id: {}", saved.getId());
         
         return branchMapper.toDTO(saved);
+    }
+
+    // ============ MÉTODOS PARA PROVIDERS ============
+
+    @Transactional(readOnly = true)
+    public List<BranchDTO> findByProviderId(Long providerId) {
+        log.debug("Obteniendo sucursales del provider: {}", providerId);
+        return branchRepository.findByProviderId(providerId).stream()
+                .map(branchMapper::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public BranchDTO createForProvider(CreateBranchRequest request, Long providerId) {
+        log.info("Provider {} creando sucursal: {}", providerId, request.getName());
+        
+        Branch branch = Branch.builder()
+                .name(request.getName())
+                .address(request.getAddress())
+                .active(true)
+                .providerId(providerId)  // Auto-asignar provider desde JWT
+                .build();
+        
+        Branch saved = branchRepository.save(branch);
+        log.info("Sucursal creada con id: {} para provider: {}", saved.getId(), providerId);
+        
+        return branchMapper.toDTO(saved);
+    }
+
+    @Transactional
+    public BranchDTO updateForProvider(Long id, CreateBranchRequest request, Long providerId) {
+        log.info("Provider {} actualizando sucursal: {}", providerId, id);
+        
+        Branch branch = branchRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Sucursal no encontrada con id: " + id));
+        
+        // VALIDAR OWNERSHIP
+        if (!providerId.equals(branch.getProviderId())) {
+            log.warn("Provider {} intentó editar sucursal {} que pertenece a provider {}", 
+                    providerId, id, branch.getProviderId());
+            throw new AccessDeniedException("No tienes permiso para editar esta sucursal");
+        }
+        
+        branch.setName(request.getName());
+        branch.setAddress(request.getAddress());
+        
+        Branch updated = branchRepository.save(branch);
+        log.info("Sucursal {} actualizada por provider: {}", id, providerId);
+        
+        return branchMapper.toDTO(updated);
+    }
+
+    @Transactional
+    public void deleteForProvider(Long id, Long providerId) {
+        log.info("Provider {} eliminando sucursal: {}", providerId, id);
+        
+        Branch branch = branchRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Sucursal no encontrada con id: " + id));
+        
+        // VALIDAR OWNERSHIP
+        if (!providerId.equals(branch.getProviderId())) {
+            log.warn("Provider {} intentó eliminar sucursal {} que pertenece a provider {}", 
+                    providerId, id, branch.getProviderId());
+            throw new AccessDeniedException("No tienes permiso para eliminar esta sucursal");
+        }
+        
+        branchRepository.deleteById(id);
+        log.info("Sucursal {} eliminada por provider: {}", id, providerId);
+    }
+
+    @Transactional
+    public BranchDTO setActiveForProvider(Long id, Boolean active, Long providerId) {
+        log.info("Provider {} {} sucursal: {}", providerId, active ? "habilitando" : "inhabilitando", id);
+        
+        Branch branch = branchRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Sucursal no encontrada con id: " + id));
+        
+        // VALIDAR OWNERSHIP
+        if (!providerId.equals(branch.getProviderId())) {
+            log.warn("Provider {} intentó modificar estado de sucursal {} que pertenece a provider {}", 
+                    providerId, id, branch.getProviderId());
+            throw new AccessDeniedException("No tienes permiso para modificar esta sucursal");
+        }
+        
+        branch.setActive(active);
+        Branch updated = branchRepository.save(branch);
+        log.info("Sucursal {} {} por provider: {}", id, active ? "habilitada" : "inhabilitada", providerId);
+        
+        return branchMapper.toDTO(updated);
     }
 }
 

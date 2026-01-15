@@ -9,6 +9,7 @@ import java.util.List;
 @Repository
 public interface BranchRepository extends JpaRepository<Branch, Long> {
     List<Branch> findByActiveTrue();
+    List<Branch> findByProviderId(Long providerId);
 }
 
 

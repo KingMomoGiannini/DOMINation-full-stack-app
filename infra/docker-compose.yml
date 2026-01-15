@@ -71,7 +71,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-auth:5432/auth_db
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
-      SPRING_SECURITY_OAUTH2_AUTHORIZATIONSERVER_ISSUER: http://localhost:9000
+      ISSUER_URI: http://auth-service:9000
     ports:
       - "9000:9000"
     depends_on:
@@ -93,7 +93,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-catalog:5432/domination_catalog
       SPRING_DATASOURCE_USERNAME: domination
       SPRING_DATASOURCE_PASSWORD: domination123
-      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://host.docker.internal:9000
+      ISSUER_URI: http://auth-service:9000
     ports:
       - "8081:8081"
     depends_on:
@@ -117,7 +117,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-booking:5432/domination_booking
       SPRING_DATASOURCE_USERNAME: domination
       SPRING_DATASOURCE_PASSWORD: domination123
-      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://host.docker.internal:9000
+      ISSUER_URI: http://auth-service:9000
       CATALOG_SERVICE_URL: http://catalog-service:8081
     ports:
       - "8082:8082"
@@ -140,14 +140,13 @@ services:
       context: ../gateway
       dockerfile: Dockerfile
     container_name: domination-gateway
-    environment:
-      SPRING_CLOUD_GATEWAY_ROUTES_0_URI: http://catalog-service:8081
-      SPRING_CLOUD_GATEWAY_ROUTES_1_URI: http://booking-service:8082
     ports:
       - "8080:8080"
     depends_on:
-      - catalog-service
-      - booking-service
+      catalog-service:
+        condition: service_started
+      booking-service:
+        condition: service_started
     networks:
       - domination-network
     restart: unless-stopped

@@ -1,5 +1,6 @@
 package com.domination.booking.service;
 
+import com.domination.booking.model.BranchResponse;
 import com.domination.booking.model.ItemDetailResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,6 +43,30 @@ public class CatalogClient {
         } catch (Exception e) {
             log.error("Error al consultar item {} desde catalog-service", itemId, e);
             throw new RuntimeException("No se pudo obtener el item " + itemId + " del catálogo", e);
+        }
+    }
+
+    /**
+     * Obtiene los detalles de un branch desde catalog-service
+     */
+    public BranchResponse getBranchDetail(Long branchId) {
+        log.debug("Consultando branch {} desde catalog-service", branchId);
+        
+        String url = catalogServiceUrl + "/api/catalog/branches/" + branchId;
+        
+        try {
+            BranchResponse response = restClient.get()
+                    .uri(url)
+                    .retrieve()
+                    .body(BranchResponse.class);
+            
+            log.debug("Branch {} obtenido: name={}, providerId={}", 
+                    branchId, response.getName(), response.getProviderId());
+            
+            return response;
+        } catch (Exception e) {
+            log.error("Error al consultar branch {} desde catalog-service", branchId, e);
+            throw new RuntimeException("No se pudo obtener el branch " + branchId + " del catálogo", e);
         }
     }
 }
