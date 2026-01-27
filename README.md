@@ -2,44 +2,25 @@
 
 Monorepo completo con arquitectura de microservicios para la gestión de sucursales, inventario y reservas.
 
-## 🏗️ Arquitectura
+## 🚀 Quickstart (5 minutos)
 
-- **Frontend**: React 18 + TypeScript + Vite
-- **API Gateway**: Spring Cloud Gateway
-- **Microservicios**:
-  - `auth-service`: Autenticación OAuth2/JWT (Authorization Server)
-  - `catalog-service`: Gestión de sucursales, items e inventario
-  - `booking-service`: Gestión de reservas
-- **Bases de Datos**: PostgreSQL (una DB por servicio)
-- **Seguridad**: OAuth2/JWT con Authorization Server y Resource Servers
-
-## 📋 Requisitos Previos
-
-- Java 21
-- Maven 3.9+
-- Node.js 18+
-- Docker & Docker Compose
-
-## 🚀 Inicio Rápido
-
-### 1. Levantar Infraestructura con Docker Compose
+### 1. Levantar Backend con Docker Compose
 
 ```bash
 cd infra
-docker-compose build --no-cache
 docker-compose up -d
 ```
 
-Esto levantará:
-- PostgreSQL para auth-service (puerto 5434)
-- PostgreSQL para catalog-service (puerto 5432)
-- PostgreSQL para booking-service (puerto 5433)
-- auth-service (puerto 9000)
-- catalog-service (puerto 8081)
-- booking-service (puerto 8082)
-- gateway (puerto 8080)
+Esto levanta automáticamente:
+- **3 bases de datos PostgreSQL** (puertos 5432, 5433, 5434)
+- **auth-service** (puerto 9000) - Autenticación OAuth2/JWT
+- **catalog-service** (puerto 8081) - Gestión de sucursales e inventario
+- **booking-service** (puerto 8082) - Gestión de reservas
+- **gateway** (puerto 8080) - API Gateway
+- **Prometheus** (puerto 9090) - Métricas
+- **Grafana** (puerto 3000) - Dashboards
 
-### 2. Levantar Frontend (Desarrollo)
+### 2. Levantar Frontend
 
 ```bash
 cd frontend
@@ -47,23 +28,77 @@ npm install
 npm run dev
 ```
 
-El frontend estará disponible en `http://localhost:5173`
+Frontend disponible en: **http://localhost:5173**
 
-## 📡 Endpoints Principales
+### 3. Verificar que todo funciona
 
-### Gateway (puerto 8080)
+```bash
+# Health check del gateway
+curl http://localhost:8080/actuator/health
+
+# Listar sucursales (público)
+curl http://localhost:8080/api/catalog/branches
+```
+
+### 4. Login
+
+- URL: http://localhost:5173/login
+- Usuario: `adminSeba`
+- Contraseña: `123456admin`
+
+**✅ Listo!** Ya podes usar la aplicación.
+
+> 📖 Para más detalles: ver [Documentación Técnica](./docs/)
+
+## 🏗️ Arquitectura
+
+- **Frontend**: React 18 + TypeScript + Vite (puerto 5173)
+- **API Gateway**: Spring Cloud Gateway (puerto 8080)
+- **Microservicios**:
+  - `auth-service` (puerto 9000) - OAuth2/JWT Authorization Server
+  - `catalog-service` (puerto 8081) - Gestión de sucursales e inventario
+  - `booking-service` (puerto 8082) - Gestión de reservas
+- **Bases de Datos**: PostgreSQL (una DB por servicio)
+- **Observabilidad**: Prometheus + Grafana
+- **Seguridad**: OAuth2/JWT con Authorization Server y Resource Servers
+
+## 📋 Requisitos Previos
+
+- **Docker & Docker Compose** (para backend)
+- **Node.js 18+** (para frontend)
+- **Java 21 + Maven 3.9+** (solo si desarrollas sin Docker)
+
+## 📡 URLs y Endpoints
+
+### Servicios
+
+| Servicio | URL | Descripción |
+|----------|-----|-------------|
+| **Frontend** | http://localhost:5173 | Aplicación React |
+| **Gateway** | http://localhost:8080 | API Gateway |
+| **Auth Service** | http://localhost:9000 | Autenticación OAuth2/JWT |
+| **Catalog Service** | http://localhost:8081 | Gestión de catálogo |
+| **Booking Service** | http://localhost:8082 | Gestión de reservas |
+| **Prometheus** | http://localhost:9090 | Métricas |
+| **Grafana** | http://localhost:3000 | Dashboards (admin/admin) |
+
+### Endpoints Principales (vía Gateway)
 
 - `GET /api/catalog/branches` - Listar sucursales (público)
 - `GET /api/catalog/items` - Listar items (público)
 - `POST /api/booking/reservations` - Crear reserva (requiere JWT)
 - `GET /api/booking/my/reservations` - Mis reservas (requiere JWT)
 
-### Acceso Directo a Servicios (desarrollo)
+### Actuator Endpoints
 
-- Catalog Service: `http://localhost:8081`
-  - Swagger UI: `http://localhost:8081/swagger-ui.html`
-- Booking Service: `http://localhost:8082`
-  - Swagger UI: `http://localhost:8082/swagger-ui.html`
+Todos los servicios exponen:
+- `GET /actuator/health` - Health check
+- `GET /actuator/prometheus` - Métricas Prometheus
+
+### Swagger UI (desarrollo)
+
+- Catalog Service: http://localhost:8081/swagger-ui.html
+- Booking Service: http://localhost:8082/swagger-ui.html
 
 ## 🔐 Autenticación
 
@@ -146,32 +181,17 @@ curl http://localhost:8080/api/booking/my/reservations \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
+## 📚 Documentación Técnica
+
+- [**Arquitectura**](./docs/arquitectura.md) - Diseño del sistema y componentes
+- [**Setup Local**](./docs/setup-local.md) - Desarrollo sin Docker
+- [**Docker Compose**](./docs/docker-compose.md) - Configuración de contenedores
+- [**Observabilidad**](./docs/observabilidad.md) - Prometheus, Grafana y métricas
+- [**Troubleshooting**](./docs/troubleshooting.md) - Solución de problemas comunes
+
 ## 🛠️ Desarrollo Local (sin Docker)
 
-### Backend Services
-
-```bash
-# Terminal 1 - Catalog Service
-cd services/catalog-service
-mvn spring-boot:run
-
-# Terminal 2 - Booking Service
-cd services/booking-service
-mvn spring-boot:run
-
-# Terminal 3 - Gateway
-cd gateway
-mvn spring-boot:run
-```
-
-**Nota**: Necesitarás PostgreSQL corriendo localmente en puertos 5432 y 5433.
-
-### Frontend
-
-```bash
-cd frontend
-npm run dev
-```
+Ver [docs/setup-local.md](./docs/setup-local.md) para instrucciones detalladas.
 
 ## 🗄️ Base de Datos
 
@@ -250,12 +270,16 @@ curl http://localhost:8080/api/catalog/items
 
 ```
 /
-├── frontend/          - React TS aplicación
-├── gateway/           - Spring Cloud Gateway
+├── frontend/              - React 18 + TypeScript + Vite
+├── gateway/               - Spring Cloud Gateway
 ├── services/
-│   ├── catalog-service/   - Microservicio de catálogo
-│   └── booking-service/   - Microservicio de reservas
-└── infra/             - Docker Compose y configs
+│   ├── auth-service/      - OAuth2/JWT Authorization Server
+│   ├── catalog-service/   - Gestión de sucursales e inventario
+│   └── booking-service/   - Gestión de reservas
+├── infra/                 - Docker Compose y configs
+│   ├── docker-compose.yml - Orquestación de servicios
+│   └── prometheus/        - Configuración de Prometheus
+└── docs/                  - Documentación técnica
 ```
 
 ## 🎨 Diseño y UX
@@ -273,13 +297,21 @@ La aplicación cuenta con:
 
 ## 🔒 Seguridad
 
-- OAuth2 + JWT para autenticación
-- Resource Servers en catalog y booking services
-- Tokens con expiración de 1 hora
-- Refresh tokens con 7 días de validez
-- Endpoints públicos para navegación
-- Endpoints protegidos para reservas
-- CORS configurado para el frontend
+- **OAuth2 + JWT** para autenticación
+- **Resource Servers** en catalog y booking services
+- **Tokens** con expiración de 1 hora
+- **Refresh tokens** con 7 días de validez
+- **CORS** configurado en gateway para frontend (localhost:5173)
+- **Request-Id tracing** para correlación de logs
+
+## 🔍 Observabilidad
+
+- **Prometheus** scraping métricas de todos los servicios
+- **Grafana** con dashboards preconfigurados
+- **Request-Id** propagado en headers y logs (MDC)
+- **Actuator** endpoints en todos los servicios
+
+Ver [docs/observabilidad.md](./docs/observabilidad.md) para más detalles.
 
 ## 🤝 Contribución
 
