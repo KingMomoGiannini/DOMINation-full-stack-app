@@ -1,0 +1,23 @@
+global:
+  scrape_interval: 10s
+
+scrape_configs:
+  - job_name: gateway
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['domination-gateway:8080']
+
+  - job_name: catalog
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['domination-catalog-service:8081']
+
+  - job_name: booking
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['domination-booking-service:8082']
+
+  - job_name: auth
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['domination-auth-service:9000']
