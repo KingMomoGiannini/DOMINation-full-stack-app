@@ -8,11 +8,13 @@ import com.domination.booking.dto.CreateReservationRequest;
 import com.domination.booking.dto.ReservationDTO;
 import com.domination.booking.exception.ConflictException;
 import com.domination.booking.exception.InsufficientStockException;
+import com.domination.booking.exception.NotFoundException;
 import com.domination.booking.mapper.ReservationMapper;
 import com.domination.booking.model.ItemDetailResponse;
 import com.domination.booking.repository.ReservationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.crossstore.ChangeSetPersister;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -166,6 +168,31 @@ public class ReservationService {
 
         log.debug("Validación TIME_QUANTITY OK para itemId={}", itemId);
     }
+
+    /**
+        *   Mét0do cancel(...) Objetivo: transacción que busca, valida ownership, aplica regla “ya empezó”, setea status CANCELLED y guarda.
+        *   Buscar la reserva por id + customerId (ideal para no filtrar existencia).
+        *   Si ya está CANCELLED ⇒ return tal cual.
+        *   Si no, validar si se puede cancelar (si aplica).
+        *   Set status y persistir.
+    */
+    @Transactional
+    public ReservationDTO cancelReservation(Long reservationId, String customerId){
+        Reservation reservation = reservationRepository
+                .findByIdAndCustomerId(reservationId,customerId)
+                .orElseThrow(() -> new NotFoundException("Reserva no encontrada"));
+        if (reservation.getStatus() == ReservationStatus.CANCELLED){
+            return reservationMapper.toDTO(reservation);
+        }
+        if (!reservation.getStartAt().isAfter(java.time.LocalDateTime.now())){
+            throw new ConflictException("No se puede cancelar una reserva que ya empezó");
+        }
+        reservation.setStatus(ReservationStatus.CANCELLED);
+        Reservation saved = reservationRepository.save(reservation);
+        return reservationMapper.toDTO(saved);
+        // TODO Sprint stock real: liberar inventario/hold en catalog-service
+    }
+
 }
 
 

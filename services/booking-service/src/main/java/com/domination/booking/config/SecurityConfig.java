@@ -44,8 +44,13 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // Swagger & Actuator públicos
                 .requestMatchers("/actuator/**").permitAll()
-                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
-                
+                .requestMatchers(
+                        "/swagger-ui/**",
+                        "/swagger-ui.html",
+                        "/v3/api-docs/**",
+                        "/api-docs",
+                        "/api-docs/**"
+                ).permitAll()
                 // Todos los endpoints de booking requieren JWT
                 .requestMatchers("/api/booking/**").authenticated()
                 

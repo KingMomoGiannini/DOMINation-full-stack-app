@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface ReservationRepository extends JpaRepository<Reservation, Long> {
@@ -50,6 +51,9 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
             @Param("endAt") LocalDateTime endAt,
             @Param("excludeStatus") ReservationStatus excludeStatus
     );
+
+    Optional<Reservation> findByIdAndCustomerId(Long id, String customerId);
+
 }
 
 

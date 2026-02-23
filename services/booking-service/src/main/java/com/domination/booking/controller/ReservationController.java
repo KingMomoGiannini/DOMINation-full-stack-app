@@ -24,7 +24,7 @@ import java.util.List;
 @RequestMapping("/api/booking")
 @RequiredArgsConstructor
 @Tag(name = "Reservations", description = "API de reservas (requiere JWT)")
-@SecurityRequirement(name = "bearer-jwt")
+@SecurityRequirement(name = "bearerAuth")
 public class ReservationController {
 
     private final ReservationService reservationService;
@@ -72,6 +72,23 @@ public class ReservationController {
             return Long.parseLong((String) userIdClaim);
         }
         throw new IllegalStateException("userId tiene un tipo no soportado: " + userIdClaim.getClass());
+    }
+
+    /**
+     * endpoint de cancelación
+     * Saca customerId del JWT (normalmente jwt.getSubject() o claim "sub").
+     * Llama service.cancel(id, customerId).
+     * Devuelve ReservationDTO con mapper.
+     */
+    @PostMapping("/reservations/{id}/cancel")
+    @PreAuthorize("hasRole('USER')")
+    public ReservationDTO cancelReservation(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        String customerId = String.valueOf(extractUserId(jwt));
+        return reservationService.cancelReservation(id,customerId);
+
     }
 }
 
