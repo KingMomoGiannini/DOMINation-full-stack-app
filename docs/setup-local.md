@@ -287,7 +287,7 @@ Para desarrollo diario, usa **Docker Compose** (más simple). Usa setup local so
 
 ## Changelog
 
-### 2025-02-23
+### 2026-02-23
 
 - Swagger booking-service: notas sobre `/api-docs` y SecurityConfig.
 - Tests booking-service: propiedades del profile `test` y recomendaciones de validación.

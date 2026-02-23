@@ -330,7 +330,7 @@ Los tests usan profile `test` con `application-test.properties` (ver [setup-loca
 
 ## Changelog
 
-### 2025-02-23
+### 2026-02-23
 
 - Nota sobre tests de booking-service: solo requiere postgres-booking (puerto 5433).
 

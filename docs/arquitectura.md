@@ -240,6 +240,6 @@ Ver [setup-local.md](./setup-local.md) para más detalles.
 
 ## Changelog
 
-### 2025-02-23
+### 2026-02-23
 
 - **Booking Service**: Soporta creación, listado y cancelación de reservas. Validación de conflictos (409) por solapamiento/cantidad; transición futura a "stock real" documentada.

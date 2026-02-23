@@ -354,7 +354,7 @@ Si Prometheus consume mucha memoria:
 
 ## Changelog
 
-### 2025-02-23
+### 2026-02-23
 
 - Documentación revisada para alinear con el resto del repo.
 

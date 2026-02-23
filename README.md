@@ -358,7 +358,7 @@ Proyecto desarrollado por Sebastián Giannini - INSPT
 
 ## Changelog de documentación
 
-### 2025-02-23
+### 2026-02-23
 
 - **Swagger en booking-service**: Configuración OpenAPI con SecurityScheme Bearer JWT; Swagger UI carga correctamente tras permitir `/api-docs` y `/swagger-ui/**` en SecurityConfig.
 - **Endpoints booking-service**: Agregados `POST /api/booking/reservations/{id}/cancel`, `GET /api/booking/provider/reservations`; convención 201 para crear reserva.

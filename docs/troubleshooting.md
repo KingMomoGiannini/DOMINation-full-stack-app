@@ -507,7 +507,7 @@ Si el problema persiste:
 
 ## Changelog
 
-### 2025-02-23
+### 2026-02-23
 
 - Swagger UI: "Failed to load remote configuration" (401 en /api-docs) → permitir en SecurityConfig.
 - Swagger Authorize no aparece → falta SecurityScheme bearer JWT en OpenAPI.
