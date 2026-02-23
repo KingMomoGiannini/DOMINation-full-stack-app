@@ -416,6 +416,71 @@ docker volume ls
 docker system prune -a
 ```
 
+## Swagger UI: "Failed to load remote configuration"
+
+### Síntoma
+
+Swagger UI (http://localhost:8082/swagger-ui.html) abre pero muestra "Failed to load remote configuration" o no carga la spec.
+
+### Causa
+
+El endpoint `/api-docs` devuelve **401** porque está protegido por Spring Security.
+
+### Solución
+
+En el **booking-service**, en `SecurityConfig`, permitir explícitamente:
+
+- `/swagger-ui/**`
+- `/swagger-ui.html`
+- `/api-docs`
+- `/api-docs/**`
+- `/v3/api-docs/**` (por compatibilidad)
+
+Resultado: `/api-docs` responde 200 y Swagger UI carga correctamente.
+
+## Swagger: Authorize no aparece / no puedo pegar token
+
+### Síntoma
+
+El candado en Swagger no abre modal o no permite pegar el token JWT.
+
+### Causa
+
+El OpenAPI no declara un `SecurityScheme` Bearer (JWT).
+
+### Solución
+
+Agregar configuración OpenAPI con un `SecurityScheme` tipo HTTP Bearer (JWT) para habilitar "Authorize". Ejemplo (Java):
+
+```java
+@Bean
+public OpenAPI customOpenAPI() {
+  return new OpenAPI()
+    .components(new Components()
+      .addSecuritySchemes("bearer-jwt",
+        new SecurityScheme().type(SecurityScheme.Type.HTTP).scheme("bearer").bearerFormat("JWT")));
+}
+```
+
+## Swagger: Authorize aplicado pero requests siguen 401 / anonymous
+
+### Síntoma
+
+Se pega el token en Authorize pero las peticiones siguen retornando 401 o "anonymous".
+
+### Causa
+
+El nombre del `SecurityRequirement` en el controller no coincide con el nombre del scheme declarado en OpenAPI.
+
+### Solución
+
+Alinear el nombre del `@SecurityRequirement` del controller con el nombre del scheme. Ejemplo:
+
+- Scheme: `bearer-jwt`
+- Controller: `@SecurityRequirement(name = "bearer-jwt")`
+
+Si el nombre no coincide, Swagger no envía el header `Authorization: Bearer <token>`.
+
 ## Obtener Ayuda
 
 Si el problema persiste:
@@ -437,3 +502,13 @@ Si el problema persiste:
    - Pasos para reproducir
    - Logs relevantes
    - Configuración (sin datos sensibles)
+
+---
+
+## Changelog
+
+### 2025-02-23
+
+- Swagger UI: "Failed to load remote configuration" (401 en /api-docs) → permitir en SecurityConfig.
+- Swagger Authorize no aparece → falta SecurityScheme bearer JWT en OpenAPI.
+- Swagger autoriza pero requests 401/anonymous → mismatch nombre SecurityRequirement vs SecurityScheme.

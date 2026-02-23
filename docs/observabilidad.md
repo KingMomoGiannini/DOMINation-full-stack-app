@@ -350,6 +350,14 @@ Si Prometheus consume mucha memoria:
 4. **Alertas**: Configurar alertas para métricas críticas
 5. **Labels**: Usar labels consistentes para facilitar queries
 
+---
+
+## Changelog
+
+### 2025-02-23
+
+- Documentación revisada para alinear con el resto del repo.
+
 ## Referencias
 
 - [Prometheus Documentation](https://prometheus.io/docs/)

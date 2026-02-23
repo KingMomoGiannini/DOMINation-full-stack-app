@@ -301,6 +301,23 @@ Los targets usan nombres de host internos de Docker.
    - URL: `http://prometheus:9090`
 4. Importar dashboard (ver [observabilidad.md](./observabilidad.md))
 
+## Tests del booking-service
+
+Para ejecutar los tests del booking-service solo hace falta levantar **postgres-booking**:
+
+```bash
+cd infra
+docker-compose up -d postgres-booking
+```
+
+Crear la base de datos de test en el puerto 5433:
+
+```bash
+docker-compose exec postgres-booking psql -U domination -d domination_booking -c "CREATE DATABASE domination_booking_test;"
+```
+
+Los tests usan profile `test` con `application-test.properties` (ver [setup-local.md](./setup-local.md)).
+
 ## Mejores Prácticas
 
 1. **No commitees datos sensibles**: Usa `.env` para contraseñas
@@ -308,6 +325,14 @@ Los targets usan nombres de host internos de Docker.
 3. **Volúmenes nombrados**: Facilitan backup y restauración
 4. **Logs estructurados**: Facilita debugging
 5. **Resource limits**: En producción, define límites de CPU/memoria
+
+---
+
+## Changelog
+
+### 2025-02-23
+
+- Nota sobre tests de booking-service: solo requiere postgres-booking (puerto 5433).
 
 ## Producción
 

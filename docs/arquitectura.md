@@ -72,13 +72,22 @@ DOMINation es una aplicación de gestión de reservas de salas de ensayo constru
 - **Tecnología**: Spring Boot, Spring Security (Resource Server)
 - **Base de Datos**: PostgreSQL (puerto 5433)
 - **Responsabilidades**:
-  - Gestión de reservas
-  - Validación de disponibilidad (consulta catalog-service)
-  - Historial de reservas por usuario
+  - Gestión de reservas (creación, listado, cancelación)
+  - Validación de conflictos por solapamiento y cantidad reservada (Modo A: lógica)
+  - Historial de reservas por usuario y por provider/sucursal
 
-**Endpoints principales**:
-- `POST /api/reservations` - Crear reserva (requiere JWT)
-- `GET /api/my/reservations` - Mis reservas (requiere JWT)
+**Endpoints principales** (base path `/api/booking`):
+- `POST /api/booking/reservations` - Crear reserva (requiere JWT) → 201
+- `GET /api/booking/my/reservations` - Mis reservas (ROLE_USER)
+- `GET /api/booking/provider/reservations` - Reservas del provider/sucursal (ROLE_PROVIDER)
+- `POST /api/booking/reservations/{id}/cancel` - Cancelar reserva (idempotente) → 200
+
+**Validación de conflictos**:
+- En Modo A, la validación es **lógica**: solapamiento de horarios y cantidad reservada vs disponibilidad.
+- El "stock real" (físico) se implementará en una fase posterior.
+- En conflicto: retorna **409 Conflict** con body estructurado (`title`, `detail`, `status`, `instance`, `timestamp`).
+
+**Swagger UI**: http://localhost:8082/swagger-ui.html — con Authorize (JWT Bearer) para probar endpoints protegidos.
 
 ## Flujo de Peticiones
 
@@ -226,3 +235,11 @@ auth-service
 - Frontend en modo desarrollo (hot reload)
 
 Ver [setup-local.md](./setup-local.md) para más detalles.
+
+---
+
+## Changelog
+
+### 2025-02-23
+
+- **Booking Service**: Soporta creación, listado y cancelación de reservas. Validación de conflictos (409) por solapamiento/cantidad; transición futura a "stock real" documentada.

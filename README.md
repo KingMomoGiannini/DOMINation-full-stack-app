@@ -86,8 +86,10 @@ curl http://localhost:8080/api/catalog/branches
 
 - `GET /api/catalog/branches` - Listar sucursales (público)
 - `GET /api/catalog/items` - Listar items (público)
-- `POST /api/booking/reservations` - Crear reserva (requiere JWT)
-- `GET /api/booking/my/reservations` - Mis reservas (requiere JWT)
+- `POST /api/booking/reservations` - Crear reserva (requiere JWT) → retorna **201**
+- `GET /api/booking/my/reservations` - Mis reservas (ROLE_USER)
+- `GET /api/booking/provider/reservations` - Reservas del provider/sucursal (ROLE_PROVIDER)
+- `POST /api/booking/reservations/{id}/cancel` - Cancelar reserva (idempotente, retorna 200)
 
 ### Actuator Endpoints
 
@@ -98,7 +100,7 @@ Todos los servicios exponen:
 ### Swagger UI (desarrollo)
 
 - Catalog Service: http://localhost:8081/swagger-ui.html
-- Booking Service: http://localhost:8082/swagger-ui.html
+- Booking Service: http://localhost:8082/swagger-ui.html (ver sección "Cómo usar Swagger con JWT" abajo)
 
 ## 🔐 Autenticación
 
@@ -244,6 +246,31 @@ Una vez levantados los servicios:
 - Catalog Service: http://localhost:8081/swagger-ui.html
 - Booking Service: http://localhost:8082/swagger-ui.html
 
+> **Nota**: El auth-service **no** expone Swagger; el login se hace por frontend o por curl/Postman.
+
+## Cómo usar Swagger con JWT (booking-service)
+
+El booking-service expone Swagger UI en http://localhost:8082/swagger-ui.html. Para probar endpoints protegidos:
+
+1. **Obtener token JWT** (elige una opción):
+   - **Frontend**: Login en http://localhost:5173/login → DevTools → Application → Local Storage → copiar el token.
+   - **Postman/curl**:
+     ```bash
+     curl -X POST http://localhost:9000/auth/login \
+       -H "Content-Type: application/json" \
+       -d '{"username":"adminSeba","password":"123456admin"}'
+     # Para ROLE_PROVIDER: usar usuario providerDemo (creado por seeder si aplica)
+     ```
+     Respuesta incluye `accessToken`.
+
+2. **En Swagger**: Ir a http://localhost:8082/swagger-ui.html → **Authorize** (candado) → pegar solo el token (sin "Bearer ") → Authorize.
+
+3. **Ejecutar endpoints**:
+   - `GET /api/booking/my/reservations` → 200
+   - `GET /api/booking/provider/reservations` → 200 (si tienes ROLE_PROVIDER)
+   - `POST /api/booking/reservations` → 201 al crear
+   - `POST /api/booking/reservations/{id}/cancel` → 200 (idempotente)
+
 ## 🔄 Flujo de Trabajo
 
 1. **Navegación pública**: Los usuarios pueden ver sucursales e items sin autenticarse
@@ -326,6 +353,17 @@ Este es un proyecto académico/profesional. Para contribuir:
 ## 📝 Licencia
 
 Proyecto desarrollado por Sebastián Giannini - INSPT
+
+---
+
+## Changelog de documentación
+
+### 2025-02-23
+
+- **Swagger en booking-service**: Configuración OpenAPI con SecurityScheme Bearer JWT; Swagger UI carga correctamente tras permitir `/api-docs` y `/swagger-ui/**` en SecurityConfig.
+- **Endpoints booking-service**: Agregados `POST /api/booking/reservations/{id}/cancel`, `GET /api/booking/provider/reservations`; convención 201 para crear reserva.
+- **Conflictos 409**: Al crear reserva en horario ya ocupado, retorna 409 con body estructurado (title, detail, status, instance, timestamp). Validación actual: lógica (solapamiento/cantidad reservada); "stock real" pendiente.
+- **Testing booking-service**: Tests unitarios (ReservationService), integración con Postgres local; profile `test` con `application-test.properties`; propiedades clave documentadas en [setup-local.md](./docs/setup-local.md) y [docker-compose.md](./docs/docker-compose.md).
 
 ## 🔮 Roadmap
 

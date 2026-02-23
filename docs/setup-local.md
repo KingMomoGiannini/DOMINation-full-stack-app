@@ -258,9 +258,36 @@ Si un puerto está ocupado:
 - Más pasos de setup
 - Dependencias del sistema operativo
 
+## Swagger en booking-service
+
+- **URL**: http://localhost:8082/swagger-ui.html
+- **OpenAPI**: `springdoc.api-docs.path=/api-docs` (no `/v3/api-docs` por defecto)
+- Si Swagger muestra "Failed to load remote configuration", suele ser porque `/api-docs` devuelve 401: debe estar permitido en `SecurityConfig` del booking-service (`/api-docs`, `/api-docs/**`, `/swagger-ui/**`, `/swagger-ui.html`). Ver [troubleshooting](./troubleshooting.md).
+
+## Tests del booking-service
+
+Los tests usan profile `test` con `application-test.properties` apuntando a `domination_booking_test` en puerto 5433. Propiedades clave:
+
+- `spring.test.database.replace=none` — evita que Spring reemplace el datasource por H2 embebido
+- `spring.jpa.hibernate.ddl-auto=create-drop` — limpia el schema por corrida
+- `spring.sql.init.mode=never`
+
+Para correr tests solo hace falta tener **postgres-booking** levantado (puerto 5433). Ver [docker-compose.md](./docker-compose.md).
+
+**Validación en tests**: Si se desactiva con `jakarta.persistence.validation.mode=none`, los tests evitan errores por datos incompletos, pero se recomienda usar datos válidos (ej. `price != null`) cuando sea posible.
+
 ## Recomendación
 
 Para desarrollo diario, usa **Docker Compose** (más simple). Usa setup local solo si necesitas:
 - Debugging avanzado con breakpoints
 - Modificar código Java con hot reload
 - Testing de integración local
+
+---
+
+## Changelog
+
+### 2025-02-23
+
+- Swagger booking-service: notas sobre `/api-docs` y SecurityConfig.
+- Tests booking-service: propiedades del profile `test` y recomendaciones de validación.
