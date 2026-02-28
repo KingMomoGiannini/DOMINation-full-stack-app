@@ -316,11 +316,21 @@ Crear la base de datos de test en el puerto 5433:
 docker-compose exec postgres-booking psql -U domination -d domination_booking -c "CREATE DATABASE domination_booking_test;"
 ```
 
+**Nota:** Si el usuario `domination` no tiene permiso para crear bases de datos, usar como fallback:
+
+```bash
+# Conectar como postgres (superuser) y dar permiso
+docker-compose exec postgres-booking psql -U postgres -d postgres -c "ALTER USER domination CREATEDB;"
+
+# Luego crear la base de datos
+docker-compose exec postgres-booking psql -U domination -d domination_booking -c "CREATE DATABASE domination_booking_test;"
+```
+
 Los tests usan profile `test` con `application-test.properties` (ver [setup-local.md](./setup-local.md)).
 
 ## Mejores Prácticas
 
-1. **No commitees datos sensibles**: Usa `.env` para contraseñas
+1. **No commitees datos sensibles**: Usar `.env` para contraseñas
 2. **Usa health checks**: Aseguran que los servicios estén listos
 3. **Volúmenes nombrados**: Facilitan backup y restauración
 4. **Logs estructurados**: Facilita debugging
@@ -336,7 +346,7 @@ Los tests usan profile `test` con `application-test.properties` (ver [setup-loca
 
 ## Producción
 
-Para producción, considera:
+Para producción, considerar:
 
 - Usar Docker Swarm o Kubernetes
 - Secrets management (Docker Secrets, Vault)

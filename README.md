@@ -86,10 +86,10 @@ curl http://localhost:8080/api/catalog/branches
 
 - `GET /api/catalog/branches` - Listar sucursales (público)
 - `GET /api/catalog/items` - Listar items (público)
-- `POST /api/booking/reservations` - Crear reserva (requiere JWT) → retorna **201**
+- `POST /api/booking/reservations` - Crear reserva (requiere JWT), retorna 201
 - `GET /api/booking/my/reservations` - Mis reservas (ROLE_USER)
 - `GET /api/booking/provider/reservations` - Reservas del provider/sucursal (ROLE_PROVIDER)
-- `POST /api/booking/reservations/{id}/cancel` - Cancelar reserva (idempotente, retorna 200)
+- `POST /api/booking/reservations/{id}/cancel` - Cancelar reserva (idempotente), retorna 200
 
 ### Actuator Endpoints
 
@@ -263,7 +263,7 @@ El booking-service expone Swagger UI en http://localhost:8082/swagger-ui.html. P
      ```
      Respuesta incluye `accessToken`.
 
-2. **En Swagger**: Ir a http://localhost:8082/swagger-ui.html → **Authorize** (candado) → pegar solo el token (sin "Bearer ") → Authorize.
+2. **En Swagger**: Ir a http://localhost:8082/swagger-ui.html → **Authorize** (candado) → “Pegá el token. Si Swagger no lo toma, probá Bearer <token>.” → Authorize.
 
 3. **Ejecutar endpoints**:
    - `GET /api/booking/my/reservations` → 200
@@ -360,10 +360,10 @@ Proyecto desarrollado por Sebastián Giannini - INSPT
 
 ### 2026-02-23
 
-- **Swagger en booking-service**: Configuración OpenAPI con SecurityScheme Bearer JWT; Swagger UI carga correctamente tras permitir `/api-docs` y `/swagger-ui/**` en SecurityConfig.
-- **Endpoints booking-service**: Agregados `POST /api/booking/reservations/{id}/cancel`, `GET /api/booking/provider/reservations`; convención 201 para crear reserva.
-- **Conflictos 409**: Al crear reserva en horario ya ocupado, retorna 409 con body estructurado (title, detail, status, instance, timestamp). Validación actual: lógica (solapamiento/cantidad reservada); "stock real" pendiente.
-- **Testing booking-service**: Tests unitarios (ReservationService), integración con Postgres local; profile `test` con `application-test.properties`; propiedades clave documentadas en [setup-local.md](./docs/setup-local.md) y [docker-compose.md](./docs/docker-compose.md).
+- **Swagger en booking-service**: Configuración OpenAPI con SecurityScheme Bearer JWT. Swagger UI carga correctamente tras permitir `/api-docs` y `/swagger-ui/**` en SecurityConfig.
+- **Endpoints booking-service**: Agregados `POST /api/booking/reservations/{id}/cancel`, `GET /api/booking/provider/reservations`. Convención 201 para crear reserva.
+- **Conflictos 409**: Al crear reserva en horario ya ocupado, retorna 409 con body estructurado (title, detail, status, instance, timestamp). Validación actual: lógica (solapamiento/cantidad reservada). "Stock real" pendiente.
+- **Testing booking-service**: Tests unitarios (ReservationService), integración con Postgres local. Profile `test` con `application-test.properties`. Propiedades clave en [setup-local.md](./docs/setup-local.md) y [docker-compose.md](./docs/docker-compose.md).
 
 ## 🔮 Roadmap
 

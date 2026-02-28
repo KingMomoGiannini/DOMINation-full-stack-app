@@ -450,7 +450,9 @@ El OpenAPI no declara un `SecurityScheme` Bearer (JWT).
 
 ### Solución
 
-Agregar configuración OpenAPI con un `SecurityScheme` tipo HTTP Bearer (JWT) para habilitar "Authorize". Ejemplo (Java):
+Agregar el `SecurityScheme` tipo HTTP Bearer (JWT) para habilitar "Authorize". Puede declararse mediante:
+
+- **Bean Java** (ejemplo):
 
 ```java
 @Bean
@@ -461,6 +463,7 @@ public OpenAPI customOpenAPI() {
         new SecurityScheme().type(SecurityScheme.Type.HTTP).scheme("bearer").bearerFormat("JWT")));
 }
 ```
+- **Annotations** sobre la clase o métodos del controller (según la librería OpenAPI/SpringDoc usada).
 
 ## Swagger: Authorize aplicado pero requests siguen 401 / anonymous
 
@@ -470,13 +473,13 @@ Se pega el token en Authorize pero las peticiones siguen retornando 401 o "anony
 
 ### Causa
 
-El nombre del `SecurityRequirement` en el controller no coincide con el nombre del scheme declarado en OpenAPI.
+El nombre del `SecurityRequirement` en el controller **no coincide** con el nombre del scheme declarado en OpenAPI. El nombre debe ser exactamente el mismo.
 
 ### Solución
 
-Alinear el nombre del `@SecurityRequirement` del controller con el nombre del scheme. Ejemplo:
+Alinear el nombre del `@SecurityRequirement(name = "...")` del controller con el nombre del scheme. Ejemplo:
 
-- Scheme: `bearer-jwt`
+- Scheme declarado: `"bearer-jwt"`
 - Controller: `@SecurityRequirement(name = "bearer-jwt")`
 
 Si el nombre no coincide, Swagger no envía el header `Authorization: Bearer <token>`.
