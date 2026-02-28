@@ -1,5 +1,6 @@
 package com.domination.booking.controller;
 
+import com.domination.booking.dto.AvailabilityResponse;
 import com.domination.booking.dto.CreateReservationRequest;
 import com.domination.booking.dto.ReservationDTO;
 import com.domination.booking.service.ReservationService;
@@ -55,6 +56,18 @@ public class ReservationController {
         String customerId = String.valueOf(extractUserId(jwt));
         ReservationDTO created = reservationService.createReservation(request, customerId);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    }
+
+    @PostMapping("/availability")
+    @PreAuthorize("hasRole('USER')")
+    @Operation(summary = "Pre-check de disponibilidad", description = "Valida disponibilidad sin persistir reservas (ROLE_USER)")
+    public ResponseEntity<AvailabilityResponse> checkAvailability(
+            @Valid @RequestBody CreateReservationRequest request,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        String customerId = String.valueOf(extractUserId(jwt));
+        AvailabilityResponse response = reservationService.checkAvailability(request, customerId);
+        return ResponseEntity.ok(response);
     }
 
     /**

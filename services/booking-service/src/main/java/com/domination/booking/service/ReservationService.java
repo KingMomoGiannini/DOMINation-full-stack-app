@@ -3,6 +3,8 @@ package com.domination.booking.service;
 import com.domination.booking.domain.Reservation;
 import com.domination.booking.domain.ReservationLine;
 import com.domination.booking.domain.ReservationStatus;
+import com.domination.booking.dto.AvailabilityConflictDTO;
+import com.domination.booking.dto.AvailabilityResponse;
 import com.domination.booking.dto.CreateReservationLineRequest;
 import com.domination.booking.dto.CreateReservationRequest;
 import com.domination.booking.dto.ReservationDTO;
@@ -14,7 +16,6 @@ import com.domination.booking.model.ItemDetailResponse;
 import com.domination.booking.repository.ReservationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.crossstore.ChangeSetPersister;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -85,6 +86,101 @@ public class ReservationService {
         log.info("Reserva creada con id: {}", saved.getId());
 
         return reservationMapper.toDTO(saved);
+    }
+
+    @Transactional(readOnly = true)
+    public AvailabilityResponse checkAvailability(CreateReservationRequest request, String customerId) {
+        log.info("Chequeando disponibilidad para cliente {} en sucursal {}", customerId, request.getBranchId());
+
+        List<AvailabilityConflictDTO> conflicts = new ArrayList<>();
+
+        // Validar rango sin lanzar excepción
+        if (!request.getStartAt().isBefore(request.getEndAt())) {
+            conflicts.add(AvailabilityConflictDTO.builder()
+                    .itemId(null)
+                    .reason("INVALID_RANGE")
+                    .detail("La fecha de inicio debe ser anterior a la fecha de fin")
+                    .requestedQty(null)
+                    .availableQty(null)
+                    .reservedQty(null)
+                    .build());
+
+            log.warn("Rango inválido en checkAvailability para cliente {}: startAt={}, endAt={}",
+                    customerId, request.getStartAt(), request.getEndAt());
+
+            return AvailabilityResponse.builder()
+                    .available(false)
+                    .conflicts(conflicts)
+                    .build();
+        }
+
+        for (CreateReservationLineRequest lineReq : request.getLines()) {
+            Long itemId = lineReq.getItemId();
+            Integer requestedQty = lineReq.getQuantity();
+            log.debug("Pre-check línea: itemId={}, quantity={}", itemId, requestedQty);
+
+            ItemDetailResponse itemDetail = catalogClient.getItemDetail(itemId);
+
+            if (!Boolean.TRUE.equals(itemDetail.getActive())) {
+                conflicts.add(AvailabilityConflictDTO.builder()
+                        .itemId(itemId)
+                        .reason("ITEM_INACTIVE")
+                        .detail("El item " + itemId + " no está activo")
+                        .requestedQty(requestedQty)
+                        .availableQty(null)
+                        .reservedQty(null)
+                        .build());
+                continue;
+            }
+
+            if ("TIME_EXCLUSIVE".equals(itemDetail.getRentalMode())) {
+                List<Reservation> overlapping = reservationRepository.findOverlappingReservations(
+                        itemId, request.getStartAt(), request.getEndAt(), ReservationStatus.CANCELLED
+                );
+
+                if (!overlapping.isEmpty()) {
+                    conflicts.add(AvailabilityConflictDTO.builder()
+                            .itemId(itemId)
+                            .reason("OVERLAP")
+                            .detail(String.format("El item %d ya está reservado en el horario solicitado", itemId))
+                            .requestedQty(requestedQty)
+                            .availableQty(null)
+                            .reservedQty(null)
+                            .build());
+                }
+                continue;
+            }
+
+            if ("TIME_QUANTITY".equals(itemDetail.getRentalMode())) {
+                Integer totalStock = itemDetail.getQuantityTotal();
+                Integer reservedQty = reservationRepository.sumReservedQuantity(
+                        itemId, request.getStartAt(), request.getEndAt(), ReservationStatus.CANCELLED
+                );
+                if (reservedQty == null) {
+                    reservedQty = 0;
+                }
+
+                if (totalStock == null || requestedQty == null || (reservedQty + requestedQty > totalStock)) {
+                    conflicts.add(AvailabilityConflictDTO.builder()
+                            .itemId(itemId)
+                            .reason("INSUFFICIENT_STOCK")
+                            .detail(String.format("Stock insuficiente para item %d en el rango solicitado", itemId))
+                            .requestedQty(requestedQty)
+                            .availableQty(totalStock)
+                            .reservedQty(reservedQty)
+                            .build());
+                }
+            }
+        }
+
+        boolean available = conflicts.isEmpty();
+        log.info("Resultado checkAvailability cliente {}: available={}, conflicts={}",
+                customerId, available, conflicts.size());
+
+        return AvailabilityResponse.builder()
+                .available(available)
+                .conflicts(conflicts)
+                .build();
     }
 
     private void processReservationLine(Reservation reservation, CreateReservationLineRequest lineReq) {
