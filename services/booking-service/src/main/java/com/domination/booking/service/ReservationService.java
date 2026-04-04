@@ -12,7 +12,10 @@ import com.domination.booking.exception.ConflictException;
 import com.domination.booking.exception.InsufficientStockException;
 import com.domination.booking.exception.NotFoundException;
 import com.domination.booking.mapper.ReservationMapper;
+import com.domination.booking.model.HoldInventoryRequest;
+import com.domination.booking.model.HoldInventoryResponse;
 import com.domination.booking.model.ItemDetailResponse;
+import com.domination.booking.model.ReleaseInventoryRequest;
 import com.domination.booking.repository.ReservationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -76,9 +79,16 @@ public class ReservationService {
                 .lines(new ArrayList<>())
                 .build();
 
+        List<String> createdHoldIds = new ArrayList<>();
+
         // Procesar cada línea de reserva
-        for (CreateReservationLineRequest lineReq : request.getLines()) {
-            processReservationLine(reservation, lineReq);
+        try {
+            for (CreateReservationLineRequest lineReq : request.getLines()) {
+                processReservationLine(reservation, lineReq, customerId, request.getBranchId(), createdHoldIds);
+            }
+        } catch (RuntimeException ex) {
+            releaseCreatedHoldsBestEffort(createdHoldIds);
+            throw ex;
         }
 
         // Guardar la reserva
@@ -183,7 +193,11 @@ public class ReservationService {
                 .build();
     }
 
-    private void processReservationLine(Reservation reservation, CreateReservationLineRequest lineReq) {
+    private void processReservationLine(Reservation reservation,
+                                        CreateReservationLineRequest lineReq,
+                                        String customerId,
+                                        Long branchId,
+                                        List<String> createdHoldIds) {
         Long itemId = lineReq.getItemId();
         Integer requestedQty = lineReq.getQuantity();
 
@@ -214,6 +228,23 @@ public class ReservationService {
                 .quantity(requestedQty)
                 .price(totalPrice)
                 .build();
+
+        if ("TIME_QUANTITY".equals(itemDetail.getRentalMode())) {
+            String reference = "cust-" + customerId + "-branch-" + branchId;
+            HoldInventoryRequest holdRequest = HoldInventoryRequest.builder()
+                    .itemId(itemId)
+                    .quantity(requestedQty)
+                    .startAt(reservation.getStartAt())
+                    .endAt(reservation.getEndAt())
+                    .reference(reference)
+                    .build();
+
+            HoldInventoryResponse holdResponse = catalogClient.holdInventory(holdRequest);
+            if (holdResponse != null && holdResponse.getHoldId() != null) {
+                line.setHoldId(holdResponse.getHoldId());
+                createdHoldIds.add(holdResponse.getHoldId());
+            }
+        }
 
         reservation.getLines().add(line);
 
@@ -285,8 +316,30 @@ public class ReservationService {
         }
         reservation.setStatus(ReservationStatus.CANCELLED);
         Reservation saved = reservationRepository.save(reservation);
+
+        // Liberación best-effort de holds de líneas TIME_QUANTITY
+        saved.getLines().stream()
+                .map(ReservationLine::getHoldId)
+                .filter(holdId -> holdId != null && !holdId.isBlank())
+                .forEach(this::releaseHoldBestEffort);
+
         return reservationMapper.toDTO(saved);
-        // TODO Sprint stock real: liberar inventario/hold en catalog-service
+    }
+
+    private void releaseCreatedHoldsBestEffort(List<String> holdIds) {
+        for (String holdId : holdIds) {
+            releaseHoldBestEffort(holdId);
+        }
+    }
+
+    private void releaseHoldBestEffort(String holdId) {
+        try {
+            catalogClient.releaseInventory(ReleaseInventoryRequest.builder()
+                    .holdId(holdId)
+                    .build());
+        } catch (Exception e) {
+            log.warn("No se pudo liberar holdId={} (best-effort)", holdId, e);
+        }
     }
 
 }
