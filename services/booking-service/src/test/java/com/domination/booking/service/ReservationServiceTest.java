@@ -13,6 +13,7 @@ import com.domination.booking.model.BranchResponse;
 import com.domination.booking.model.HoldInventoryRequest;
 import com.domination.booking.model.ItemDetailResponse;
 import com.domination.booking.repository.ReservationRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -25,7 +26,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
-import static  org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,8 +36,15 @@ class ReservationServiceTest {
     @Mock private ReservationRepository reservationRepository;
     @Mock private ReservationMapper reservationMapper;
     @Mock private CatalogClient catalogClient;
+    @Mock private ReservationDtoEnricher reservationDtoEnricher;
 
     @InjectMocks private ReservationService reservationService;
+
+    @BeforeEach
+    void stubEnricher() {
+        lenient().doNothing().when(reservationDtoEnricher).enrichMissingCatalogFields(anyList());
+        lenient().doNothing().when(reservationDtoEnricher).enrichCustomerUsernamesForProvider(anyList(), nullable(String.class));
+    }
 
     @Test
     void createReservation_throwsIllegalArgumentException_whenStartIsNotBeforeEnd() {
@@ -172,12 +181,14 @@ class ReservationServiceTest {
 
         var branchDetail = mock(BranchResponse.class);
         when(branchDetail.getProviderId()).thenReturn(777L);
+        when(branchDetail.getName()).thenReturn("Sede Test");
         when(catalogClient.getBranchDetail(10L)).thenReturn(branchDetail);
 
         ItemDetailResponse itemDetail = mock(ItemDetailResponse.class);
         when(itemDetail.getActive()).thenReturn(true);
         when(itemDetail.getRentalMode()).thenReturn("TIME_EXCLUSIVE");
         when(itemDetail.getBasePrice()).thenReturn(new BigDecimal("100.00"));
+        when(itemDetail.getName()).thenReturn("Sala A");
         when(catalogClient.getItemDetail(5L)).thenReturn(itemDetail);
 
         when(reservationRepository.findOverlappingReservations(
@@ -202,6 +213,7 @@ class ReservationServiceTest {
         assertEquals("cust-1", saved.getCustomerId());
         assertEquals(10L, saved.getBranchId());
         assertEquals(777L, saved.getProviderId());
+        assertEquals("Sede Test", saved.getBranchName());
         assertEquals(start, saved.getStartAt());
         assertEquals(end, saved.getEndAt());
         assertEquals(ReservationStatus.PENDING, saved.getStatus());
@@ -210,11 +222,13 @@ class ReservationServiceTest {
 
         var line = saved.getLines().get(0);
         assertEquals(5L, line.getItemId());
+        assertEquals("Sala A", line.getItemName());
         assertEquals(3, line.getQuantity());
         assertEquals(new BigDecimal("300.00"), line.getPrice()); // 100 * 3
 
         verify(reservationRepository).save(any(Reservation.class));
         verify(reservationMapper).toDTO(any(Reservation.class));
+        verify(reservationDtoEnricher).enrichMissingCatalogFields(anyList());
     }
 
     @Test

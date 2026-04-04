@@ -15,7 +15,15 @@ import java.util.List;
 public class ReservationDTO {
     private Long id;
     private String customerId;
+    /**
+     * Nombre de usuario del cliente (solo en contexto provider; resuelto vía auth-service con JWT del prestador).
+     */
+    private String customerUsername;
     private Long branchId;
+    /**
+     * Nombre legible de la sucursal (persistido al crear o rellenado al leer si faltaba en datos legacy).
+     */
+    private String branchName;
     private Long providerId;
     private LocalDateTime startAt;
     private LocalDateTime endAt;

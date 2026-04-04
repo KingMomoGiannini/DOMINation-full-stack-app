@@ -19,6 +19,7 @@ public class ReservationMapper {
         return ReservationDTO.builder()
                 .id(reservation.getId())
                 .customerId(reservation.getCustomerId())
+                .branchName(reservation.getBranchName())
                 .branchId(reservation.getBranchId())
                 .providerId(reservation.getProviderId())
                 .startAt(reservation.getStartAt())
@@ -39,6 +40,7 @@ public class ReservationMapper {
         return ReservationLineDTO.builder()
                 .id(line.getId())
                 .itemId(line.getItemId())
+                .itemName(line.getItemName())
                 .quantity(line.getQuantity())
                 .price(line.getPrice())
                 .build();

@@ -28,3 +28,27 @@ export function resolveBranchDisplay(map: Map<number, Branch>, branchId: number)
     resolved: false,
   };
 }
+
+/**
+ * Prioriza `branchName` del DTO de reserva (Sprint 8); si falta, cruza con el mapa del catálogo.
+ */
+export function resolveReservationBranchDisplay(
+  branchId: number,
+  branchNameFromDto: string | null | undefined,
+  map: Map<number, Branch>,
+  catalogFetched: boolean,
+  loadingSecondary: string
+): BranchDisplay {
+  const trimmed = branchNameFromDto?.trim();
+  if (trimmed) {
+    return { primary: trimmed, secondary: null, resolved: true };
+  }
+  if (!catalogFetched) {
+    return {
+      primary: 'Sucursal',
+      secondary: loadingSecondary,
+      resolved: false,
+    };
+  }
+  return resolveBranchDisplay(map, branchId);
+}

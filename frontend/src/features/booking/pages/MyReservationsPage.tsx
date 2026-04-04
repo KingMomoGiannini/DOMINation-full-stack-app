@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { cancelReservation, getBranches, getMyReservations } from '../../../api';
 import type { Reservation } from '../../../types/booking';
-import { branchesToMap, resolveBranchDisplay } from '../../../utils/branchLookup';
+import { branchesToMap, resolveReservationBranchDisplay } from '../../../utils/branchLookup';
 import { formatReservationSchedule, getReservationStatusMeta } from '../../../utils/reservationDisplay';
 import { Spinner } from '../../../components/ui/Spinner';
 import { EmptyState } from '../../../components/ui/EmptyState';
@@ -25,9 +25,15 @@ export function MyReservationsPage() {
     queryFn: getMyReservations,
   });
 
+  const needsBranchCatalog = useMemo(() => {
+    const list = listQuery.data ?? [];
+    return list.some((r) => !String(r.branchName ?? '').trim());
+  }, [listQuery.data]);
+
   const branchesQuery = useQuery({
     queryKey: ['branches'],
     queryFn: getBranches,
+    enabled: (listQuery.data?.length ?? 0) > 0 && needsBranchCatalog,
   });
 
   const branchMap = useMemo(() => branchesToMap(branchesQuery.data ?? []), [branchesQuery.data]);
@@ -54,16 +60,14 @@ export function MyReservationsPage() {
 
   const canCancel = (r: Reservation) => r.status !== 'CANCELLED';
 
-  const renderBranch = (branchId: number) => {
-    if (!branchesQuery.isFetched) {
-      return {
-        primary: 'Sucursal',
-        secondary: 'Sincronizando nombre con el catálogo público…',
-        resolved: false,
-      };
-    }
-    return resolveBranchDisplay(branchMap, branchId);
-  };
+  const renderBranch = (r: Reservation) =>
+    resolveReservationBranchDisplay(
+      r.branchId,
+      r.branchName,
+      branchMap,
+      !needsBranchCatalog || branchesQuery.isFetched,
+      'Sincronizando nombre con el catálogo público…'
+    );
 
   return (
     <div className="main-content">
@@ -94,7 +98,7 @@ export function MyReservationsPage() {
         />
       )}
 
-      {branchesQuery.isError && (
+      {needsBranchCatalog && branchesQuery.isError && (
         <QueryErrorPanel
           error={branchesQuery.error}
           fallback="No pudimos cargar el catálogo de sucursales."
@@ -121,7 +125,7 @@ export function MyReservationsPage() {
           {sorted.map((r) => {
             const schedule = formatReservationSchedule(r.startAt, r.endAt);
             const statusMeta = getReservationStatusMeta(r.status);
-            const branch = renderBranch(r.branchId);
+            const branch = renderBranch(r);
             return (
               <article key={r.id} className="reservation-card">
                 <div className="reservation-card__top">

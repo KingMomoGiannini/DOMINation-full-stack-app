@@ -12,6 +12,10 @@ import java.math.BigDecimal;
 public class ReservationLineDTO {
     private Long id;
     private Long itemId;
+    /**
+     * Nombre del ítem (snapshot al reservar o rellenado al leer si faltaba).
+     */
+    private String itemName;
     private Integer quantity;
     private BigDecimal price;
 }

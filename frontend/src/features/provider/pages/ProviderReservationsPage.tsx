@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { getMyBranches, getProviderReservations } from '../../../api';
 import type { Reservation } from '../../../types/booking';
-import { branchesToMap, resolveBranchDisplay } from '../../../utils/branchLookup';
+import { branchesToMap, resolveReservationBranchDisplay } from '../../../utils/branchLookup';
 import { formatReservationSchedule, getReservationStatusMeta } from '../../../utils/reservationDisplay';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { Spinner } from '../../../components/ui/Spinner';
@@ -19,9 +19,15 @@ export function ProviderReservationsPage() {
     queryFn: getProviderReservations,
   });
 
+  const needsBranchCatalog = useMemo(() => {
+    const list = listQuery.data ?? [];
+    return list.some((r) => !String(r.branchName ?? '').trim());
+  }, [listQuery.data]);
+
   const branchesQuery = useQuery({
     queryKey: ['providerBranches'],
     queryFn: getMyBranches,
+    enabled: (listQuery.data?.length ?? 0) > 0 && needsBranchCatalog,
   });
 
   const branchMap = useMemo(() => branchesToMap(branchesQuery.data ?? []), [branchesQuery.data]);
@@ -33,16 +39,17 @@ export function ProviderReservationsPage() {
     return copy;
   }, [rows]);
 
-  const renderBranch = (branchId: number) => {
-    if (!branchesQuery.isFetched) {
-      return {
-        primary: 'Sucursal',
-        secondary: 'Cargando tus sucursales para mostrar el nombre…',
-        resolved: false,
-      };
-    }
-    const d = resolveBranchDisplay(branchMap, branchId);
-    if (!d.resolved) {
+  const renderBranch = (r: Reservation) => {
+    const catalogReady = !needsBranchCatalog || branchesQuery.isFetched;
+    const d = resolveReservationBranchDisplay(
+      r.branchId,
+      r.branchName,
+      branchMap,
+      catalogReady,
+      'Cargando tus sucursales para mostrar el nombre…'
+    );
+    if (d.resolved) return d;
+    if (catalogReady && needsBranchCatalog) {
       return {
         primary: d.primary,
         secondary: [
@@ -78,7 +85,7 @@ export function ProviderReservationsPage() {
         />
       )}
 
-      {branchesQuery.isError && (
+      {needsBranchCatalog && branchesQuery.isError && (
         <QueryErrorPanel
           error={branchesQuery.error}
           fallback="No pudimos cargar tus sucursales para mostrar nombres."
@@ -99,7 +106,7 @@ export function ProviderReservationsPage() {
           {sorted.map((r) => {
             const schedule = formatReservationSchedule(r.startAt, r.endAt);
             const statusMeta = getReservationStatusMeta(r.status);
-            const branch = renderBranch(r.branchId);
+            const branch = renderBranch(r);
             return (
               <article key={r.id} className="reservation-card">
                 <div className="reservation-card__top">
@@ -111,11 +118,23 @@ export function ProviderReservationsPage() {
                     </div>
                     <p className="reservation-card__ref">Referencia interna · #{r.id}</p>
                     <p className="provider-customer-ref">
-                      Cliente (identificador en sistema): <code style={{ color: '#fff' }}>{r.customerId}</code>
-                      <br />
-                      <span style={{ fontSize: '0.8rem' }}>
-                        El backend no envía nombre de usuario; solo este id de cuenta.
-                      </span>
+                      {r.customerUsername?.trim() ? (
+                        <>
+                          Cliente: <strong>@{r.customerUsername.trim()}</strong>
+                          <br />
+                          <span style={{ fontSize: '0.8rem' }}>
+                            ID de cuenta: <code style={{ color: '#fff' }}>{r.customerId}</code>
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          Cliente (ID de cuenta): <code style={{ color: '#fff' }}>{r.customerId}</code>
+                          <br />
+                          <span style={{ fontSize: '0.8rem' }}>
+                            Sin nombre de usuario en la respuesta (reserva antigua o no se pudo enriquecer).
+                          </span>
+                        </>
+                      )}
                     </p>
                   </div>
                   <ReservationStatusBadge meta={statusMeta} />

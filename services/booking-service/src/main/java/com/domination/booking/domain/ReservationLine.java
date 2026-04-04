@@ -31,6 +31,12 @@ public class ReservationLine {
     @Column(name = "item_id", nullable = false)
     private Long itemId;
 
+    /**
+     * Nombre del ítem al momento de la reserva (snapshot; el precio total ya está en {@link #price}).
+     */
+    @Column(name = "item_name", length = 255)
+    private String itemName;
+
     @NotNull(message = "La cantidad es obligatoria")
     @Positive(message = "La cantidad debe ser positiva")
     @Column(nullable = false)

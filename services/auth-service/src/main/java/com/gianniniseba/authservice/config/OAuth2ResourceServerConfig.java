@@ -3,6 +3,7 @@ package com.gianniniseba.authservice.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -56,6 +57,7 @@ public class OAuth2ResourceServerConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .requestMatchers("/auth/provider-requests/**").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/users/*/handle-for-provider").hasRole("PROVIDER")
                         .requestMatchers("/users/**").authenticated()
                         .requestMatchers("/test/**").authenticated()
                         .anyRequest().authenticated()

@@ -34,23 +34,29 @@ public class ReservationService {
     private final ReservationRepository reservationRepository;
     private final ReservationMapper reservationMapper;
     private final CatalogClient catalogClient;
+    private final ReservationDtoEnricher reservationDtoEnricher;
 
     @Transactional(readOnly = true)
     public List<ReservationDTO> getMyReservations(String customerId) {
         log.debug("Obteniendo reservas del cliente: {}", customerId);
-        
-        return reservationRepository.findByCustomerId(customerId).stream()
+
+        List<ReservationDTO> list = reservationRepository.findByCustomerId(customerId).stream()
                 .map(reservationMapper::toDTO)
                 .collect(Collectors.toList());
+        reservationDtoEnricher.enrichMissingCatalogFields(list);
+        return list;
     }
 
     @Transactional(readOnly = true)
-    public List<ReservationDTO> getProviderReservations(Long providerId) {
+    public List<ReservationDTO> getProviderReservations(Long providerId, String authorizationHeader) {
         log.debug("Obteniendo reservas del provider: {}", providerId);
-        
-        return reservationRepository.findByProviderId(providerId).stream()
+
+        List<ReservationDTO> list = reservationRepository.findByProviderId(providerId).stream()
                 .map(reservationMapper::toDTO)
                 .collect(Collectors.toList());
+        reservationDtoEnricher.enrichMissingCatalogFields(list);
+        reservationDtoEnricher.enrichCustomerUsernamesForProvider(list, authorizationHeader);
+        return list;
     }
 
     @Transactional
@@ -72,6 +78,7 @@ public class ReservationService {
         Reservation reservation = Reservation.builder()
                 .customerId(customerId)
                 .branchId(request.getBranchId())
+                .branchName(branchDetail.getName())
                 .providerId(providerId)
                 .startAt(request.getStartAt())
                 .endAt(request.getEndAt())
@@ -95,7 +102,9 @@ public class ReservationService {
         Reservation saved = reservationRepository.save(reservation);
         log.info("Reserva creada con id: {}", saved.getId());
 
-        return reservationMapper.toDTO(saved);
+        ReservationDTO dto = reservationMapper.toDTO(saved);
+        reservationDtoEnricher.enrichMissingCatalogFields(List.of(dto));
+        return dto;
     }
 
     @Transactional(readOnly = true)
@@ -225,6 +234,7 @@ public class ReservationService {
         ReservationLine line = ReservationLine.builder()
                 .reservation(reservation)
                 .itemId(itemId)
+                .itemName(itemDetail.getName())
                 .quantity(requestedQty)
                 .price(totalPrice)
                 .build();
@@ -308,8 +318,10 @@ public class ReservationService {
         Reservation reservation = reservationRepository
                 .findByIdAndCustomerId(reservationId,customerId)
                 .orElseThrow(() -> new NotFoundException("Reserva no encontrada"));
-        if (reservation.getStatus() == ReservationStatus.CANCELLED){
-            return reservationMapper.toDTO(reservation);
+        if (reservation.getStatus() == ReservationStatus.CANCELLED) {
+            ReservationDTO cancelledDto = reservationMapper.toDTO(reservation);
+            reservationDtoEnricher.enrichMissingCatalogFields(List.of(cancelledDto));
+            return cancelledDto;
         }
         if (!reservation.getStartAt().isAfter(java.time.LocalDateTime.now())){
             throw new ConflictException("No se puede cancelar una reserva que ya empezó");
@@ -323,7 +335,9 @@ public class ReservationService {
                 .filter(holdId -> holdId != null && !holdId.isBlank())
                 .forEach(this::releaseHoldBestEffort);
 
-        return reservationMapper.toDTO(saved);
+        ReservationDTO dto = reservationMapper.toDTO(saved);
+        reservationDtoEnricher.enrichMissingCatalogFields(List.of(dto));
+        return dto;
     }
 
     private void releaseCreatedHoldsBestEffort(List<String> holdIds) {

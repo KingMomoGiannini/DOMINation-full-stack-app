@@ -33,6 +33,12 @@ public class Reservation {
     private Long branchId;
 
     /**
+     * Nombre de sucursal al momento de la reserva (snapshot para listados sin depender del catálogo).
+     */
+    @Column(name = "branch_name", length = 255)
+    private String branchName;
+
+    /**
      * ID del provider dueño del branch (igual a userId del provider)
      * Se obtiene del branch al crear la reserva
      */

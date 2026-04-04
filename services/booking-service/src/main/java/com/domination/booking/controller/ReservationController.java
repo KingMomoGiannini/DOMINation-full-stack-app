@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -41,9 +42,12 @@ public class ReservationController {
     @GetMapping("/provider/reservations")
     @PreAuthorize("hasRole('PROVIDER')")
     @Operation(summary = "Obtener reservas de mis sucursales", description = "Lista las reservas de las sucursales del provider (ROLE_PROVIDER)")
-    public ResponseEntity<List<ReservationDTO>> getProviderReservations(@AuthenticationPrincipal Jwt jwt) {
+    public ResponseEntity<List<ReservationDTO>> getProviderReservations(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization
+    ) {
         Long providerId = extractUserId(jwt);
-        return ResponseEntity.ok(reservationService.getProviderReservations(providerId));
+        return ResponseEntity.ok(reservationService.getProviderReservations(providerId, authorization));
     }
 
     @PostMapping("/reservations")
