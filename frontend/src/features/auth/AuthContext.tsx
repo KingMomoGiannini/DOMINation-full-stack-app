@@ -1,5 +1,12 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { getToken, getUser, getUserRoles, getUserId, logout as apiLogout, isAuthenticated as checkAuth, hasRole as checkRole } from '../api/apiClient';
+import {
+  getUser,
+  getUserRoles,
+  getUserId,
+  logout as apiLogout,
+  isAuthenticated as checkAuth,
+  hasRole as checkRole,
+} from '../../api';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -26,7 +33,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUserId(getUserId());
   }, []);
 
-  const login = (token: string, user: string) => {
+  const login = (_token: string, user: string) => {
     setIsAuthenticated(true);
     setUsername(user);
     setRoles(getUserRoles());
@@ -42,15 +49,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ 
-      isAuthenticated, 
-      username, 
-      roles,
-      userId,
-      hasRole: checkRole,
-      login, 
-      logout 
-    }}>
+    <AuthContext.Provider
+      value={{
+        isAuthenticated,
+        username,
+        roles,
+        userId,
+        hasRole: checkRole,
+        login,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -63,5 +72,3 @@ export const useAuth = () => {
   }
   return context;
 };
-
-
