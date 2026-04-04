@@ -1,6 +1,7 @@
 package com.domination.booking.service;
 
 import com.domination.booking.domain.Reservation;
+import com.domination.booking.domain.ReservationLine;
 import com.domination.booking.domain.ReservationStatus;
 import com.domination.booking.dto.CreateReservationLineRequest;
 import com.domination.booking.dto.CreateReservationRequest;
@@ -9,6 +10,7 @@ import com.domination.booking.exception.ConflictException;
 import com.domination.booking.exception.InsufficientStockException;
 import com.domination.booking.mapper.ReservationMapper;
 import com.domination.booking.model.BranchResponse;
+import com.domination.booking.model.HoldInventoryRequest;
 import com.domination.booking.model.ItemDetailResponse;
 import com.domination.booking.repository.ReservationRepository;
 import org.junit.jupiter.api.Test;
@@ -21,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import static  org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -212,6 +215,128 @@ class ReservationServiceTest {
 
         verify(reservationRepository).save(any(Reservation.class));
         verify(reservationMapper).toDTO(any(Reservation.class));
+    }
+
+    @Test
+    void createReservation_doesNotSave_whenCatalogHoldFailsWithConflict() {
+        LocalDateTime start = LocalDateTime.now().plusDays(1);
+        LocalDateTime end = start.plusHours(2);
+
+        CreateReservationRequest request = CreateReservationRequest.builder()
+                .branchId(10L)
+                .startAt(start)
+                .endAt(end)
+                .lines(List.of(mockLine(2L, 5)))
+                .build();
+
+        var branchDetail = mock(BranchResponse.class);
+        when(branchDetail.getProviderId()).thenReturn(777L);
+        when(catalogClient.getBranchDetail(10L)).thenReturn(branchDetail);
+
+        ItemDetailResponse itemDetail = mock(ItemDetailResponse.class);
+        when(itemDetail.getActive()).thenReturn(true);
+        when(itemDetail.getRentalMode()).thenReturn("TIME_QUANTITY");
+        when(itemDetail.getQuantityTotal()).thenReturn(10);
+        when(itemDetail.getBasePrice()).thenReturn(new BigDecimal("100.00"));
+        when(catalogClient.getItemDetail(2L)).thenReturn(itemDetail);
+
+        when(reservationRepository.sumReservedQuantity(
+                eq(2L), eq(start), eq(end), eq(ReservationStatus.CANCELLED)
+        )).thenReturn(3);
+
+        when(catalogClient.holdInventory(any(HoldInventoryRequest.class)))
+                .thenThrow(new ConflictException("Stock insuficiente en catalog-service"));
+
+        assertThrows(ConflictException.class,
+                () -> reservationService.createReservation(request, "cust-1"));
+
+        verify(reservationRepository, never()).save(any());
+    }
+
+    @Test
+    void cancelReservation_releasesEachHold_whenTransitionToCancelled() {
+        Reservation reservation = Reservation.builder()
+                .id(1L)
+                .customerId("cust-1")
+                .branchId(10L)
+                .providerId(777L)
+                .startAt(LocalDateTime.now().plusHours(2))
+                .endAt(LocalDateTime.now().plusHours(4))
+                .status(ReservationStatus.PENDING)
+                .build();
+
+        ReservationLine lineWithHold1 = ReservationLine.builder()
+                .id(1L)
+                .reservation(reservation)
+                .itemId(100L)
+                .quantity(1)
+                .price(new BigDecimal("100.00"))
+                .holdId("hold-1")
+                .build();
+        ReservationLine lineWithHold2 = ReservationLine.builder()
+                .id(2L)
+                .reservation(reservation)
+                .itemId(101L)
+                .quantity(2)
+                .price(new BigDecimal("200.00"))
+                .holdId("hold-2")
+                .build();
+        ReservationLine lineWithoutHold = ReservationLine.builder()
+                .id(3L)
+                .reservation(reservation)
+                .itemId(102L)
+                .quantity(1)
+                .price(new BigDecimal("50.00"))
+                .holdId(null)
+                .build();
+        reservation.setLines(List.of(lineWithHold1, lineWithHold2, lineWithoutHold));
+
+        when(reservationRepository.findByIdAndCustomerId(1L, "cust-1"))
+                .thenReturn(Optional.of(reservation));
+        when(reservationRepository.save(any(Reservation.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ReservationDTO dto = mock(ReservationDTO.class);
+        when(reservationMapper.toDTO(any(Reservation.class))).thenReturn(dto);
+
+        ReservationDTO result = reservationService.cancelReservation(1L, "cust-1");
+
+        assertSame(dto, result);
+        assertEquals(ReservationStatus.CANCELLED, reservation.getStatus());
+        verify(catalogClient, times(2)).releaseInventory(any());
+    }
+
+    @Test
+    void cancelReservation_doesNotRelease_whenAlreadyCancelled() {
+        Reservation reservation = Reservation.builder()
+                .id(1L)
+                .customerId("cust-1")
+                .branchId(10L)
+                .providerId(777L)
+                .startAt(LocalDateTime.now().plusHours(2))
+                .endAt(LocalDateTime.now().plusHours(4))
+                .status(ReservationStatus.CANCELLED)
+                .lines(List.of(
+                        ReservationLine.builder()
+                                .id(1L)
+                                .reservation(null)
+                                .itemId(100L)
+                                .quantity(1)
+                                .price(new BigDecimal("100.00"))
+                                .holdId("hold-1")
+                                .build()
+                ))
+                .build();
+
+        when(reservationRepository.findByIdAndCustomerId(1L, "cust-1"))
+                .thenReturn(Optional.of(reservation));
+        ReservationDTO dto = mock(ReservationDTO.class);
+        when(reservationMapper.toDTO(reservation)).thenReturn(dto);
+
+        ReservationDTO result = reservationService.cancelReservation(1L, "cust-1");
+
+        assertSame(dto, result);
+        verify(catalogClient, never()).releaseInventory(any());
+        verify(reservationRepository, never()).save(any());
     }
 
     // ---------- helpers ----------

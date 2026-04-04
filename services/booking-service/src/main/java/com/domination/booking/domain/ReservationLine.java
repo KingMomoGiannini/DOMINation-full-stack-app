@@ -39,6 +39,9 @@ public class ReservationLine {
     @NotNull(message = "El precio es obligatorio")
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal price;
+
+    @Column(name = "hold_id", length = 64)
+    private String holdId;
 }
 
 
