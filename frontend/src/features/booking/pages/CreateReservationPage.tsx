@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import axios from 'axios';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -8,6 +9,7 @@ import { checkAvailability, createReservation, getBranches, getItems } from '../
 import type { CreateReservationRequest } from '../../../types/booking';
 import { Spinner } from '../../../components/ui/Spinner';
 import { EmptyState } from '../../../components/ui/EmptyState';
+import { QueryErrorPanel } from '../../../components/ui/QueryErrorPanel';
 import { getApiErrorMessage } from '../../../utils/apiError';
 
 const schema = z
@@ -170,27 +172,30 @@ export function CreateReservationPage() {
         </div>
 
         {branchesQuery.error && (
-          <div className="alert alert-error">
-            ⚠️{' '}
-            {getApiErrorMessage(branchesQuery.error, 'No pudimos cargar las sucursales.')}
-          </div>
+          <QueryErrorPanel
+            error={branchesQuery.error}
+            fallback="No pudimos cargar las sucursales."
+            title="Error al cargar sucursales"
+            onRetry={() => branchesQuery.refetch()}
+          />
         )}
 
         {mutation.isSuccess && (
-          <div className="alert alert-success">
-            <strong>Reserva confirmada.</strong>
-            <p style={{ marginTop: '0.35rem' }}>
-              Ya podés verla en «Mis reservas». Si necesitás otra franja, completá el formulario de nuevo.
+          <div className="alert alert-success alert--stack" role="status">
+            <strong>Reserva confirmada</strong>
+            <p style={{ marginTop: '0.35rem', fontWeight: 500 }}>
+              Ya podés verla en <Link to="/reservations">Mis reservas</Link>. Si necesitás otra franja, completá el
+              formulario de nuevo.
             </p>
           </div>
         )}
 
         {isAvailabilityRejection && (
-          <div className="alert alert-error" role="alert">
-            <strong>Disponibilidad: no alcanza para esta combinación</strong>
-            <p style={{ marginTop: '0.5rem' }}>
-              El chequeo previo indica que no hay cupo o la franja no está libre. Ajustá fechas, sucursal, ítem o
-              cantidad.
+          <div className="alert alert-error alert--stack" role="alert">
+            <strong>Sin disponibilidad para esta combinación</strong>
+            <p style={{ marginTop: '0.5rem', fontWeight: 500 }}>
+              El chequeo previo de disponibilidad indicó que no hay cupo o la franja no está libre.
+              Ajustá fechas, sucursal, ítem o cantidad.
             </p>
             {conflicts.length > 0 && (
               <ul style={{ marginTop: '0.75rem', paddingLeft: '1.25rem', lineHeight: 1.5 }}>
@@ -205,15 +210,15 @@ export function CreateReservationPage() {
         )}
 
         {mutation.error != null && !isAvailabilityRejection && (
-          <div className="alert alert-error" role="alert">
+          <div className="alert alert-error alert--stack" role="alert">
             <strong>
-              {isHttp409 ? 'Conflicto al guardar la reserva' : 'No pudimos completar la reserva'}
+              {isHttp409 ? 'Conflicto al confirmar la reserva' : 'No pudimos completar la reserva'}
             </strong>
-            <p style={{ marginTop: '0.5rem' }}>{serverError}</p>
+            <p style={{ marginTop: '0.5rem', fontWeight: 500 }}>{serverError}</p>
             {isHttp409 && (
-              <p style={{ marginTop: '0.5rem', color: 'var(--gray-light)', fontSize: '0.95rem' }}>
-                A veces el cupo cambia entre el chequeo y la confirmación. Probá otra franja o actualizá la página
-                y reintentá.
+              <p style={{ marginTop: '0.5rem', color: 'var(--gray-light)', fontSize: '0.95rem', fontWeight: 500 }}>
+                El cupo puede cambiar entre el chequeo y el guardado final. Probá otra franja o reintentá en unos
+                segundos.
               </p>
             )}
           </div>
@@ -296,11 +301,12 @@ export function CreateReservationPage() {
           </form>
         )}
 
-        <div className="alert alert-info" style={{ marginTop: '2rem' }}>
-          <strong>Notas:</strong>
-          <ul style={{ paddingLeft: '1.5rem', marginTop: '0.75rem', lineHeight: 1.7 }}>
-            <li>Primero validamos disponibilidad; si todo ok, se crea la reserva.</li>
+        <div className="alert alert-info alert--stack" style={{ marginTop: '2rem' }}>
+          <strong>Notas</strong>
+          <ul style={{ paddingLeft: '1.5rem', marginTop: '0.75rem', lineHeight: 1.7, fontWeight: 500 }}>
+            <li>Primero validamos disponibilidad; si todo ok, se crea la reserva en la misma acción.</li>
             <li>Las fechas deben ser coherentes (fin posterior al inicio).</li>
+            <li>Si falla la red o el gateway no responde, vas a ver un mensaje explícito; podés reintentar cargar sucursales arriba.</li>
           </ul>
         </div>
       </div>

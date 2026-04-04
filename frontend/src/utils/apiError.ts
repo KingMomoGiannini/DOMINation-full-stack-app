@@ -5,8 +5,30 @@ import axios from 'axios';
  */
 export function getApiErrorMessage(error: unknown, fallback: string): string {
   if (axios.isAxiosError(error)) {
+    if (error.response == null) {
+      if (error.code === 'ERR_NETWORK') {
+        return 'No pudimos llegar al servidor. Revisá tu conexión a internet y que el API Gateway esté disponible.';
+      }
+      if (error.code === 'ECONNABORTED') {
+        return 'La solicitud tardó demasiado (tiempo de espera agotado). Intentá de nuevo.';
+      }
+      return 'No hubo respuesta del servidor. Verificá que el gateway esté en marcha y probá otra vez.';
+    }
+
     const status = error.response?.status;
     const data = error.response?.data as Record<string, unknown> | string | undefined;
+
+    if (status === 400 && data && typeof data === 'object' && !Array.isArray(data)) {
+      const fieldErrors = data.errors;
+      if (fieldErrors && typeof fieldErrors === 'object' && !Array.isArray(fieldErrors)) {
+        const parts = Object.entries(fieldErrors as Record<string, string>)
+          .map(([k, v]) => `${k}: ${v}`)
+          .filter(Boolean);
+        if (parts.length > 0) {
+          return parts.join(' · ');
+        }
+      }
+    }
 
     if (status === 401) {
       return 'Tu sesión expiró o no tenés autorización para esta acción. Volvé a iniciar sesión.';

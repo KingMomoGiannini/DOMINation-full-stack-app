@@ -459,6 +459,21 @@ body {
   animation: slideIn 0.3s ease;
 }
 
+.alert--stack {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.alert--stack a {
+  color: inherit;
+  text-decoration: underline;
+  font-weight: 700;
+}
+
+.alert-success.alert--stack a {
+  color: #fff;
+}
+
 @keyframes slideIn {
   from {
     transform: translateY(-10px);
@@ -604,5 +619,170 @@ body {
   font-family: 'Arial', sans-serif;
   color: var(--gray-light);
   font-size: 1.1rem;
+}
+
+/* Reservas — layout compartido usuario / provider */
+.query-error-panel {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.reservation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  margin-top: 1.5rem;
+}
+
+.reservation-card {
+  background: var(--secondary);
+  border-radius: 12px;
+  padding: 1.5rem 1.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+  text-align: left;
+}
+
+.reservation-card__top {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.reservation-card__branch {
+  font-family: 'Arial', sans-serif;
+  font-size: 1.05rem;
+  color: #fff;
+  margin-top: 0.35rem;
+  line-height: 1.45;
+}
+
+.reservation-card__branch small {
+  display: block;
+  color: var(--gray-light);
+  font-weight: 500;
+  margin-top: 0.2rem;
+  font-size: 0.9rem;
+}
+
+.reservation-card__ref {
+  font-family: 'Arial', sans-serif;
+  font-size: 0.8rem;
+  color: var(--gray-light);
+  margin-top: 0.75rem;
+}
+
+.reservation-schedule-block {
+  margin-top: 0.25rem;
+}
+
+.reservation-schedule-block__day {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.85rem;
+  letter-spacing: 1px;
+  color: var(--primary);
+  margin: 0;
+  line-height: 1.2;
+}
+
+.reservation-schedule-block__time {
+  font-family: 'Arial', sans-serif;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #fff;
+  margin: 0.35rem 0 0;
+}
+
+.reservation-schedule-block__note {
+  font-family: 'Arial', sans-serif;
+  font-size: 0.9rem;
+  color: var(--gray-light);
+  margin: 0.5rem 0 0;
+  line-height: 1.4;
+}
+
+.reservation-status-badge {
+  display: inline-block;
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  font-family: 'Arial', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.reservation-status-badge--pending {
+  background: rgba(255, 136, 0, 0.25);
+  color: #ffcc80;
+  border-color: rgba(255, 136, 0, 0.6);
+}
+
+.reservation-status-badge--confirmed {
+  background: rgba(0, 160, 0, 0.28);
+  color: #b9f6b0;
+  border-color: rgba(0, 200, 80, 0.5);
+}
+
+.reservation-status-badge--cancelled {
+  background: rgba(120, 120, 120, 0.35);
+  color: #e0e0e0;
+  border-color: rgba(180, 180, 180, 0.4);
+}
+
+.reservation-status-badge--unknown {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--gray-light);
+}
+
+.reservation-lines {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.reservation-lines__title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.2rem;
+  letter-spacing: 1px;
+  color: var(--gray-light);
+  margin: 0 0 0.5rem;
+}
+
+.reservation-lines__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.reservation-lines__item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-family: 'Arial', sans-serif;
+  font-size: 0.95rem;
+  color: #fff;
+}
+
+.reservation-lines__item:last-child {
+  border-bottom: none;
+}
+
+.reservation-lines__meta {
+  font-size: 0.8rem;
+  color: var(--gray-light);
+}
+
+.provider-customer-ref {
+  font-family: 'Arial', sans-serif;
+  font-size: 0.85rem;
+  color: var(--gray-light);
+  margin-top: 0.35rem;
+  line-height: 1.4;
 }
 

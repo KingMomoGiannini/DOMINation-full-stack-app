@@ -21,6 +21,7 @@ export function LoginPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { login: authLogin } = useAuth();
   const [sessionMsg, setSessionMsg] = useState<string | null>(null);
+  const [providerRenewMsg, setProviderRenewMsg] = useState<string | null>(null);
 
   const from = (location.state as { from?: string } | null)?.from;
 
@@ -28,6 +29,13 @@ export function LoginPage() {
     if (searchParams.get('expired') === '1') {
       setSessionMsg('Tu sesión expiró o ya no es válida. Volvé a iniciar sesión.');
       searchParams.delete('expired');
+      setSearchParams(searchParams, { replace: true });
+    }
+    if (searchParams.get('providerApproved') === '1') {
+      setProviderRenewMsg(
+        'Tu rol de prestador ya está activo en el servidor. Iniciá sesión de nuevo para obtener un JWT actualizado y ver el panel de prestador.'
+      );
+      searchParams.delete('providerApproved');
       setSearchParams(searchParams, { replace: true });
     }
   }, [searchParams, setSearchParams]);
@@ -68,6 +76,7 @@ export function LoginPage() {
         </div>
 
         {sessionMsg && <div className="alert alert-error">⚠️ {sessionMsg}</div>}
+        {providerRenewMsg && <div className="alert alert-info alert--stack">{providerRenewMsg}</div>}
         {serverError && <div className="alert alert-error">⚠️ {serverError}</div>}
 
         <form onSubmit={handleSubmit(onSubmit)} noValidate>

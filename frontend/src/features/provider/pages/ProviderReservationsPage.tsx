@@ -1,22 +1,17 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { getProviderReservations } from '../../../api';
+import { getMyBranches, getProviderReservations } from '../../../api';
 import type { Reservation } from '../../../types/booking';
+import { branchesToMap, resolveBranchDisplay } from '../../../utils/branchLookup';
+import { formatReservationSchedule, getReservationStatusMeta } from '../../../utils/reservationDisplay';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { Spinner } from '../../../components/ui/Spinner';
 import { EmptyState } from '../../../components/ui/EmptyState';
-import { getApiErrorMessage } from '../../../utils/apiError';
-
-function formatRange(startAt: string, endAt: string): string {
-  try {
-    const s = new Date(startAt);
-    const e = new Date(endAt);
-    const df = new Intl.DateTimeFormat('es-AR', { dateStyle: 'short', timeStyle: 'short' });
-    return `${df.format(s)} → ${df.format(e)}`;
-  } catch {
-    return `${startAt} → ${endAt}`;
-  }
-}
+import { QueryErrorPanel } from '../../../components/ui/QueryErrorPanel';
+import { ReservationStatusBadge } from '../../../components/reservations/ReservationStatusBadge';
+import { ReservationScheduleBlock } from '../../../components/reservations/ReservationScheduleBlock';
+import { ReservationLineItems } from '../../../components/reservations/ReservationLineItems';
 
 export function ProviderReservationsPage() {
   const listQuery = useQuery({
@@ -24,55 +19,111 @@ export function ProviderReservationsPage() {
     queryFn: getProviderReservations,
   });
 
+  const branchesQuery = useQuery({
+    queryKey: ['providerBranches'],
+    queryFn: getMyBranches,
+  });
+
+  const branchMap = useMemo(() => branchesToMap(branchesQuery.data ?? []), [branchesQuery.data]);
+
   const rows: Reservation[] = listQuery.data ?? [];
-  const errorMsg =
-    listQuery.error &&
-    getApiErrorMessage(listQuery.error, 'No pudimos cargar las reservas de tus sucursales.');
+  const sorted = useMemo(() => {
+    const copy = [...rows];
+    copy.sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime());
+    return copy;
+  }, [rows]);
+
+  const renderBranch = (branchId: number) => {
+    if (!branchesQuery.isFetched) {
+      return {
+        primary: 'Sucursal',
+        secondary: 'Cargando tus sucursales para mostrar el nombre…',
+        resolved: false,
+      };
+    }
+    const d = resolveBranchDisplay(branchMap, branchId);
+    if (!d.resolved) {
+      return {
+        primary: d.primary,
+        secondary: [
+          d.secondary,
+          'Si la sucursal ya no está en tu panel, puede ser datos históricos: el contrato solo garantiza branchId.',
+        ]
+          .filter(Boolean)
+          .join(' '),
+        resolved: false,
+      };
+    }
+    return d;
+  };
 
   return (
     <div className="main-content">
       <PageHeader
         title="Reservas en"
-        highlight="mis sucursales"
-        subtitle="Listado según el backend (reservas vinculadas a tus sucursales). Solo lectura: cancelación la gestiona el cliente en su cuenta."
+        highlight="tus sucursales"
+        subtitle="Vista de solo lectura para el prestador. La cancelación la realiza el cliente desde su cuenta."
       />
 
       <p style={{ marginBottom: '1rem' }}>
         <Link to="/provider">← Volver al panel de prestador</Link>
       </p>
 
-      {errorMsg && <div className="alert alert-error">⚠️ {errorMsg}</div>}
+      {listQuery.isError && (
+        <QueryErrorPanel
+          error={listQuery.error}
+          fallback="No pudimos cargar las reservas de tus sucursales."
+          title="Error al cargar reservas"
+          onRetry={() => listQuery.refetch()}
+        />
+      )}
+
+      {branchesQuery.isError && (
+        <QueryErrorPanel
+          error={branchesQuery.error}
+          fallback="No pudimos cargar tus sucursales para mostrar nombres."
+          title="Catálogo de sucursales (prestador)"
+          onRetry={() => branchesQuery.refetch()}
+        />
+      )}
 
       {listQuery.isPending ? (
         <Spinner label="Cargando reservas…" />
-      ) : rows.length === 0 ? (
+      ) : sorted.length === 0 ? (
         <EmptyState
-          title="No hay reservas para mostrar"
-          description="Cuando haya reservas en tus sucursales, aparecerán acá."
+          title="No hay reservas en tus sucursales"
+          description="Cuando un cliente reserve una franja en una sucursal tuya, el registro aparecerá acá ordenado por fecha."
         />
       ) : (
-        <div className="cards-grid" style={{ gridTemplateColumns: '1fr' }}>
-          {rows.map((r) => (
-            <div key={r.id} className="card" style={{ textAlign: 'left' }}>
-              <h3>Reserva #{r.id}</h3>
-              <p style={{ marginTop: '0.5rem' }}>{formatRange(r.startAt, r.endAt)}</p>
-              <p>
-                Sucursal: <strong>{r.branchId}</strong> — Cliente: <strong>{r.customerId}</strong>
-              </p>
-              <p>
-                Estado: <span className="badge badge-secondary">{r.status}</span>
-              </p>
-              {r.lines?.length > 0 && (
-                <ul style={{ marginTop: '0.75rem', paddingLeft: '1.25rem' }}>
-                  {r.lines.map((line) => (
-                    <li key={line.id}>
-                      Ítem #{line.itemId} — cant. {line.quantity} — ${line.price?.toLocaleString('es-AR')}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ))}
+        <div className="reservation-list">
+          {sorted.map((r) => {
+            const schedule = formatReservationSchedule(r.startAt, r.endAt);
+            const statusMeta = getReservationStatusMeta(r.status);
+            const branch = renderBranch(r.branchId);
+            return (
+              <article key={r.id} className="reservation-card">
+                <div className="reservation-card__top">
+                  <div>
+                    <ReservationScheduleBlock schedule={schedule} />
+                    <div className="reservation-card__branch">
+                      <strong>{branch.primary}</strong>
+                      {branch.secondary ? <small>{branch.secondary}</small> : null}
+                    </div>
+                    <p className="reservation-card__ref">Referencia interna · #{r.id}</p>
+                    <p className="provider-customer-ref">
+                      Cliente (identificador en sistema): <code style={{ color: '#fff' }}>{r.customerId}</code>
+                      <br />
+                      <span style={{ fontSize: '0.8rem' }}>
+                        El backend no envía nombre de usuario; solo este id de cuenta.
+                      </span>
+                    </p>
+                  </div>
+                  <ReservationStatusBadge meta={statusMeta} />
+                </div>
+                <ReservationLineItems lines={r.lines ?? []} />
+              </article>
+            );
+          })}
         </div>
       )}
     </div>
