@@ -4,9 +4,11 @@ import com.gianniniseba.authservice.dto.UserHandleForProviderResponse;
 import com.gianniniseba.authservice.dto.UserResponse;
 import com.gianniniseba.authservice.entity.User;
 import com.gianniniseba.authservice.repository.UserRepository;
+import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,6 +23,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/users")
 @RequiredArgsConstructor
+@Validated
 public class UserController {
 
     private final UserRepository userRepository;
@@ -49,7 +52,7 @@ public class UserController {
      */
     @GetMapping("/{userId}/handle-for-provider")
     @PreAuthorize("hasRole('PROVIDER')")
-    public UserHandleForProviderResponse getHandleForProvider(@PathVariable Long userId) {
+    public UserHandleForProviderResponse getHandleForProvider(@PathVariable @Positive Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
         return UserHandleForProviderResponse.builder()

@@ -9,11 +9,16 @@ import com.domination.booking.model.ReleaseInventoryResponse;
 import com.domination.booking.exception.ConflictException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
+
+import java.util.Optional;
 
 /**
  * Cliente para comunicarse con el catalog-service
@@ -117,6 +122,78 @@ public class CatalogClient {
         } catch (Exception e) {
             log.error("Error al liberar holdId={}", request.getHoldId(), e);
             throw new RuntimeException("No se pudo liberar holdId=" + request.getHoldId(), e);
+        }
+    }
+
+    /**
+     * Lectura tolerante a fallos para enriquecer listados: no propaga excepciones.
+     */
+    public Optional<String> fetchBranchNameForEnrichment(Long branchId) {
+        if (branchId == null) {
+            return Optional.empty();
+        }
+        String rid = Optional.ofNullable(MDC.get("requestId")).orElse("-");
+        String url = catalogServiceUrl + "/api/catalog/branches/" + branchId;
+        try {
+            BranchResponse response = restClient.get()
+                    .uri(url)
+                    .retrieve()
+                    .body(BranchResponse.class);
+            if (response != null && response.getName() != null && !response.getName().isBlank()) {
+                return Optional.of(response.getName().trim());
+            }
+            log.info("catalog enrichment: nombre vacío branchId={} [requestId={}]", branchId, rid);
+            return Optional.empty();
+        } catch (RestClientResponseException ex) {
+            int code = ex.getStatusCode().value();
+            if (code == 404) {
+                log.info("catalog enrichment: branch 404 branchId={} (sin snapshot persistido o recurso ausente) [requestId={}]", branchId, rid);
+            } else {
+                log.warn("catalog enrichment: branch branchId={} httpStatus={} [requestId={}] — {}", branchId, code, rid, ex.getMessage());
+            }
+            return Optional.empty();
+        } catch (ResourceAccessException ex) {
+            log.warn("catalog enrichment: branch branchId={} reason=timeout_or_network [requestId={}] — {}", branchId, rid, ex.getMessage());
+            return Optional.empty();
+        } catch (Exception ex) {
+            log.warn("catalog enrichment: branch branchId={} reason=unexpected [requestId={}]", branchId, rid, ex);
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Lectura tolerante a fallos para enriquecer listados: no propaga excepciones.
+     */
+    public Optional<String> fetchItemNameForEnrichment(Long itemId) {
+        if (itemId == null) {
+            return Optional.empty();
+        }
+        String rid = Optional.ofNullable(MDC.get("requestId")).orElse("-");
+        String url = catalogServiceUrl + "/api/catalog/items/" + itemId;
+        try {
+            ItemDetailResponse response = restClient.get()
+                    .uri(url)
+                    .retrieve()
+                    .body(ItemDetailResponse.class);
+            if (response != null && response.getName() != null && !response.getName().isBlank()) {
+                return Optional.of(response.getName().trim());
+            }
+            log.info("catalog enrichment: nombre vacío itemId={} [requestId={}]", itemId, rid);
+            return Optional.empty();
+        } catch (RestClientResponseException ex) {
+            int code = ex.getStatusCode().value();
+            if (code == 404) {
+                log.info("catalog enrichment: item 404 itemId={} (sin snapshot persistido o recurso ausente) [requestId={}]", itemId, rid);
+            } else {
+                log.warn("catalog enrichment: item itemId={} httpStatus={} [requestId={}] — {}", itemId, code, rid, ex.getMessage());
+            }
+            return Optional.empty();
+        } catch (ResourceAccessException ex) {
+            log.warn("catalog enrichment: item itemId={} reason=timeout_or_network [requestId={}] — {}", itemId, rid, ex.getMessage());
+            return Optional.empty();
+        } catch (Exception ex) {
+            log.warn("catalog enrichment: item itemId={} reason=unexpected [requestId={}]", itemId, rid, ex);
+            return Optional.empty();
         }
     }
 

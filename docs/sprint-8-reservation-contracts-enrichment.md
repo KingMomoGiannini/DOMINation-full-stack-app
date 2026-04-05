@@ -79,8 +79,9 @@ Siguen existiendo fallbacks para datos legacy o fallos de enriquecimiento.
 
 ## 6. Qué quedó pendiente y por qué
 
-- **Migraciones Flyway/Liquibase** para `branch_name` / `item_name` en entornos con `ddl-auto` distinto de `update`.
-- **Tests de integración** del nuevo endpoint en auth y del flujo gateway + booking (los tests de contexto Spring de auth pueden requerir BD/H2 de perfil test).
+- **Migraciones Flyway/Liquibase** → cubierto en **Sprint 9** (`db/migration/V202604051200__...` en booking-service).
+- **Tests del endpoint auth** → cubierto en Sprint 9 (perfil `test` con H2 + `@WebMvcTest`).
+- **Integración gateway + booking end-to-end** del handle provider → sigue siendo prueba manual o futura suite E2E.
 - **Snapshot de precio** u otros campos comerciales: no se amplió el modelo en este sprint para no mezclar reglas de facturación con catálogo vivo sin diseño explícito.
 - **Renombre de ítem en catálogo**: el nombre persistido en la línea puede quedar desactualizado; mitigación actual = enriquecimiento en lectura desde catálogo cuando `itemName` es null.
 
@@ -92,7 +93,7 @@ Siguen existiendo fallbacks para datos legacy o fallos de enriquecimiento.
 2. **Cliente**: crear reserva; en `GET /api/booking/my/reservations` verificar `branchName`, `lines[].itemName`.
 3. **Provider**: con token de prestador, `GET /api/booking/provider/reservations` con header `Authorization`; verificar `customerUsername` y nombres.
 4. **Frontend**: abrir “Mis reservas” y panel provider; con datos nuevos, comprobar que no dispara carga de sucursales si los nombres vienen completos (red DevTools).
-5. **Tests**: `mvn test` en `booking-service` (auth-service puede fallar si el test de arranque usa Postgres local con credenciales incorrectas — problema de entorno).
+5. **Tests**: `mvn test` en `booking-service` y `auth-service` con perfil `test` (H2 en auth; ver Sprint 9).
 
 ---
 
