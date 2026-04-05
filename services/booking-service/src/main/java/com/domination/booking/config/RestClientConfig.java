@@ -1,5 +1,6 @@
 package com.domination.booking.config;
 
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -13,6 +14,7 @@ import org.springframework.web.client.RestClient;
  * {@link com.domination.booking.service.AuthClient}: timeouts acotados y correlación hacia dependencias.
  */
 @Configuration
+@Slf4j
 public class RestClientConfig {
 
     private static final String REQUEST_ID_HEADER = "X-Request-Id";
@@ -31,6 +33,7 @@ public class RestClientConfig {
                     String rid = MDC.get(MDC_REQUEST_ID);
                     if (rid != null && !rid.isBlank()) {
                         request.getHeaders().add(REQUEST_ID_HEADER, rid);
+                        log.trace("[enrichment] outbound_header {}={} uri={}", REQUEST_ID_HEADER, rid, request.getURI());
                     }
                     return execution.execute(request, body);
                 })

@@ -48,7 +48,7 @@ public class ReservationDtoEnricher {
                 }
             }
         }
-        log.debug("reservation enrichment: catalog pass completado reservas={} [requestId={}]", dtos.size(), rid);
+        log.debug("[enrichment] phase=catalog_complete reservations={} requestId={}", dtos.size(), rid);
     }
 
     public void enrichCustomerUsernamesForProvider(List<ReservationDTO> dtos, String authorizationHeader) {
@@ -56,7 +56,7 @@ public class ReservationDtoEnricher {
             return;
         }
         if (authorizationHeader == null || authorizationHeader.isBlank()) {
-            log.debug("reservation enrichment: auth username omitido (sin Authorization) [requestId={}]",
+            log.debug("[enrichment] phase=auth_skipped reason=no_authorization_header requestId={}",
                     Optional.ofNullable(MDC.get("requestId")).orElse("-"));
             return;
         }
@@ -65,7 +65,7 @@ public class ReservationDtoEnricher {
         for (ReservationDTO dto : dtos) {
             Long uid = parseCustomerId(dto.getCustomerId());
             if (uid == null) {
-                log.debug("reservation enrichment: customerId no numérico, se omite auth userId lookup id={} [requestId={}]",
+                log.debug("[enrichment] phase=auth_skip_customer reason=non_numeric_customerId customerId={} requestId={}",
                         dto.getCustomerId(), rid);
                 continue;
             }
@@ -75,7 +75,7 @@ public class ReservationDtoEnricher {
                 dto.setCustomerUsername(username);
             }
         }
-        log.debug("reservation enrichment: auth usernames pass completado reservas={} [requestId={}]", dtos.size(), rid);
+        log.debug("[enrichment] phase=auth_complete reservations={} requestId={}", dtos.size(), rid);
     }
 
     private Long parseCustomerId(String customerId) {

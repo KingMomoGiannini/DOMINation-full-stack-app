@@ -6,7 +6,7 @@
 - `pom.xml` — dependencias `flyway-core`, `flyway-database-postgresql`.
 - `src/main/resources/db/migration/V202604051200__add_reservation_display_snapshots.sql` — migración idempotente.
 - `src/main/resources/application.properties` — Flyway activo, timeouts `booking.http-client.*`.
-- `src/main/resources/application-prod.properties` — **nuevo**: Flyway en prod; comentario sobre `ddl-auto=validate` cuando exista baseline completo.
+- `src/main/resources/application-prod.properties` — Flyway en prod (Sprint 10: `ddl-auto=validate` con baseline `V202604101200`).
 - `config/RestClientConfig.java` — timeouts configurables, propagación `X-Request-Id` desde MDC `requestId`.
 - `service/CatalogClient.java` — `fetchBranchNameForEnrichment` / `fetchItemNameForEnrichment` (no lanzan; logs con `requestId` y distinción 404 vs error/timeout).
 - `service/AuthClient.java` — manejo por código HTTP (401/403/404 vs otros), timeouts vía RestClient, logs con `requestId`.

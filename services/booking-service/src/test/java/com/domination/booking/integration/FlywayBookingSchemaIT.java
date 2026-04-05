@@ -1,0 +1,59 @@
+package com.domination.booking.integration;
+
+import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.Test;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/**
+ * Verifica que el historial Flyway del booking-service crea el esquema esperado en PostgreSQL real.
+ */
+@Testcontainers
+class FlywayBookingSchemaIT {
+
+    @Container
+    @SuppressWarnings("resource")
+    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine")
+            .withDatabaseName("booking_flyway_it")
+            .withUsername("test")
+            .withPassword("test");
+
+    @Test
+    void flywayMigrations_createReservationTables_andSnapshotColumns() throws Exception {
+        Flyway.configure()
+                .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
+                .locations("classpath:db/migration")
+                .load()
+                .migrate();
+
+        try (Connection c = DriverManager.getConnection(
+                POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())) {
+            DatabaseMetaData md = c.getMetaData();
+            assertTableExists(md, "reservations");
+            assertTableExists(md, "reservation_lines");
+            assertColumnExists(md, "reservations", "branch_name");
+            assertColumnExists(md, "reservation_lines", "item_name");
+        }
+    }
+
+    private static void assertTableExists(DatabaseMetaData md, String table) throws SQLException {
+        try (ResultSet rs = md.getTables(null, "public", table, new String[]{"TABLE"})) {
+            assertTrue(rs.next(), "tabla faltante: " + table);
+        }
+    }
+
+    private static void assertColumnExists(DatabaseMetaData md, String table, String column) throws SQLException {
+        try (ResultSet rs = md.getColumns(null, "public", table, column)) {
+            assertTrue(rs.next(), "columna faltante: " + table + "." + column);
+        }
+    }
+}

@@ -49,6 +49,10 @@ public class UserController {
     /**
      * Permite a un prestador obtener el nombre de usuario público de un cliente por id.
      * No expone email. La autorización es por rol PROVIDER (vía configuración de seguridad).
+     * <p><b>Riesgo residual (aceptado):</b> un prestador autenticado puede consultar handles por {@code userId}
+     * numérico (enumeración teórica), análogo a ver {@code customerId} en listados de reservas. Mitigación
+     * operativa: rate limiting / auditoría en capa API gateway si el producto lo exige; no se cambia el
+     * contrato en este sprint sin requisito de negocio.</p>
      */
     @GetMapping("/{userId}/handle-for-provider")
     @PreAuthorize("hasRole('PROVIDER')")
