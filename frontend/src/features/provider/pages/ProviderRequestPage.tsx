@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createProviderRequest, getMyProviderRequest } from '../../../api';
 import { PageHeader } from '../../../components/ui/PageHeader';
@@ -23,6 +24,7 @@ export function ProviderRequestPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { logout } = useAuth();
+  const [submitOk, setSubmitOk] = useState(false);
 
   const requestQuery = useQuery({
     queryKey: ['providerRequest', 'me'],
@@ -33,10 +35,16 @@ export function ProviderRequestPage() {
     mutationFn: () => createProviderRequest(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['providerRequest', 'me'] });
+      setSubmitOk(true);
     },
   });
 
   const request = requestQuery.data;
+
+  useEffect(() => {
+    if (request && submitOk) setSubmitOk(false);
+  }, [request, submitOk]);
+
   const loadError =
     requestQuery.error &&
     getApiErrorMessage(requestQuery.error, 'No pudimos cargar el estado de tu solicitud.');
@@ -67,6 +75,18 @@ export function ProviderRequestPage() {
 
       {loadError && <div className="alert alert-error">⚠️ {loadError}</div>}
       {actionError && <div className="alert alert-error">⚠️ {actionError}</div>}
+      {submitOk && (
+        <div className="alert alert-success alert--stack" role="status">
+          <strong>Solicitud enviada</strong>
+          <p style={{ marginTop: '0.35rem', marginBottom: 0 }}>
+            Quedó registrada para revisión del administrador. Cuando esté aprobada, cerrá sesión y volvé a entrar para
+            obtener el rol de prestador en el token.
+          </p>
+          <button type="button" className="btn btn-secondary" style={{ marginTop: '0.65rem' }} onClick={() => setSubmitOk(false)}>
+            Cerrar
+          </button>
+        </div>
+      )}
 
       {request ? (
         <div className="card" style={{ maxWidth: '680px', margin: '0 auto', textAlign: 'left' }}>

@@ -786,3 +786,164 @@ body {
   line-height: 1.4;
 }
 
+/* Área prestador — navegación y resumen */
+.provider-area-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0 0 1.5rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.provider-area-nav__link {
+  font-family: 'Arial', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--gray-light);
+  text-decoration: none;
+  padding: 0.45rem 0.9rem;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+
+.provider-area-nav__link:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.provider-area-nav__link--active {
+  color: #fff;
+  background: rgba(255, 14, 14, 0.2);
+  border-color: rgba(255, 14, 14, 0.45);
+}
+
+.provider-stats-summary {
+  margin-bottom: 2rem;
+}
+
+.provider-stats-summary__title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.5rem;
+  letter-spacing: 2px;
+  color: #fff;
+  margin: 0 0 1rem;
+}
+
+.provider-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.provider-stat-card {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 1rem 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  text-align: left;
+}
+
+.provider-stat-card__label {
+  font-family: 'Arial', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--gray-light);
+}
+
+.provider-stat-card__value {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 2.25rem;
+  letter-spacing: 1px;
+  color: var(--primary);
+  line-height: 1;
+}
+
+.provider-stat-card__hint {
+  font-family: 'Arial', sans-serif;
+  font-size: 0.8rem;
+  color: var(--gray-light);
+  line-height: 1.35;
+}
+
+.provider-stat-card__loading {
+  font-family: 'Arial', sans-serif;
+  font-size: 0.9rem;
+  color: var(--gray-light);
+  font-style: italic;
+}
+
+/* Filtros de reservas */
+.reservation-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 1.25rem;
+  align-items: flex-end;
+  margin: 1rem 0 1.5rem;
+  padding: 1rem 1.15rem;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+}
+
+.reservation-filters__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 160px;
+}
+
+.reservation-filters__field label {
+  font-family: 'Arial', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--gray-light);
+}
+
+.reservation-filters__field select {
+  font-family: 'Arial', sans-serif;
+  font-size: 0.95rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: var(--secondary);
+  color: #fff;
+}
+
+.reservation-filters__meta {
+  font-family: 'Arial', sans-serif;
+  font-size: 0.85rem;
+  color: var(--gray-light);
+  width: 100%;
+  margin: 0;
+}
+
+.reservation-card--live {
+  border-color: rgba(0, 200, 100, 0.35);
+  box-shadow: 0 0 0 1px rgba(0, 200, 100, 0.12);
+}
+
+.reservation-card__temporal {
+  display: inline-block;
+  margin-top: 0.5rem;
+  font-family: 'Arial', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #9ee7ff;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.reservation-card__main-col {
+  flex: 1;
+  min-width: 0;
+}
+

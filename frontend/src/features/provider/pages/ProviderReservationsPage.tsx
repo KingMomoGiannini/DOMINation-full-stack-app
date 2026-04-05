@@ -1,10 +1,18 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
 import { getMyBranches, getProviderReservations } from '../../../api';
 import type { Reservation } from '../../../types/booking';
 import { branchesToMap, resolveReservationBranchDisplay } from '../../../utils/branchLookup';
 import { formatReservationSchedule, getReservationStatusMeta } from '../../../utils/reservationDisplay';
+import {
+  getReservationTemporalHint,
+  isReservationLiveNow,
+  reservationMatchesFilters,
+  sortReservations,
+  type ReservationSortMode,
+  type ReservationStatusFilter,
+  type ReservationTimeFilter,
+} from '../../../utils/reservationUi';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { Spinner } from '../../../components/ui/Spinner';
 import { EmptyState } from '../../../components/ui/EmptyState';
@@ -12,12 +20,19 @@ import { QueryErrorPanel } from '../../../components/ui/QueryErrorPanel';
 import { ReservationStatusBadge } from '../../../components/reservations/ReservationStatusBadge';
 import { ReservationScheduleBlock } from '../../../components/reservations/ReservationScheduleBlock';
 import { ReservationLineItems } from '../../../components/reservations/ReservationLineItems';
+import { ReservationFiltersBar } from '../../../components/reservations/ReservationFiltersBar';
+import { ProviderAreaNav } from '../../../components/provider/ProviderAreaNav';
 
 export function ProviderReservationsPage() {
   const listQuery = useQuery({
     queryKey: ['providerReservations'],
     queryFn: getProviderReservations,
   });
+
+  const [branchFilter, setBranchFilter] = useState<number | 'ALL'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<ReservationStatusFilter>('ALL');
+  const [timeFilter, setTimeFilter] = useState<ReservationTimeFilter>('ALL');
+  const [sortMode, setSortMode] = useState<ReservationSortMode>('START_DESC');
 
   const needsBranchCatalog = useMemo(() => {
     const list = listQuery.data ?? [];
@@ -27,17 +42,28 @@ export function ProviderReservationsPage() {
   const branchesQuery = useQuery({
     queryKey: ['providerBranches'],
     queryFn: getMyBranches,
-    enabled: (listQuery.data?.length ?? 0) > 0 && needsBranchCatalog,
+    enabled: listQuery.isSuccess && (listQuery.data?.length ?? 0) > 0,
   });
 
   const branchMap = useMemo(() => branchesToMap(branchesQuery.data ?? []), [branchesQuery.data]);
 
+  const branchOptions = useMemo(
+    () => (branchesQuery.data ?? []).map((b) => ({ id: b.id, name: b.name })),
+    [branchesQuery.data]
+  );
+
   const rows: Reservation[] = listQuery.data ?? [];
-  const sorted = useMemo(() => {
-    const copy = [...rows];
-    copy.sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime());
-    return copy;
-  }, [rows]);
+
+  const filteredSorted = useMemo(() => {
+    const filtered = rows.filter((r) =>
+      reservationMatchesFilters(r, {
+        branchId: branchFilter,
+        status: statusFilter,
+        time: timeFilter,
+      })
+    );
+    return sortReservations(filtered, sortMode);
+  }, [rows, branchFilter, statusFilter, timeFilter, sortMode]);
 
   const renderBranch = (r: Reservation) => {
     const catalogReady = !needsBranchCatalog || branchesQuery.isFetched;
@@ -69,12 +95,10 @@ export function ProviderReservationsPage() {
       <PageHeader
         title="Reservas en"
         highlight="tus sucursales"
-        subtitle="Vista de solo lectura para el prestador. La cancelación la realiza el cliente desde su cuenta."
+        subtitle="Filtrá por sucursal, estado o momento. La cancelación la hace el cliente desde su cuenta."
       />
 
-      <p style={{ marginBottom: '1rem' }}>
-        <Link to="/provider">← Volver al panel de prestador</Link>
-      </p>
+      <ProviderAreaNav />
 
       {listQuery.isError && (
         <QueryErrorPanel
@@ -96,54 +120,92 @@ export function ProviderReservationsPage() {
 
       {listQuery.isPending ? (
         <Spinner label="Cargando reservas…" />
-      ) : sorted.length === 0 ? (
+      ) : rows.length === 0 ? (
         <EmptyState
           title="No hay reservas en tus sucursales"
-          description="Cuando un cliente reserve una franja en una sucursal tuya, el registro aparecerá acá ordenado por fecha."
+          description="Cuando un cliente reserve una franja en una sucursal tuya, el registro aparecerá acá."
         />
       ) : (
-        <div className="reservation-list">
-          {sorted.map((r) => {
-            const schedule = formatReservationSchedule(r.startAt, r.endAt);
-            const statusMeta = getReservationStatusMeta(r.status);
-            const branch = renderBranch(r);
-            return (
-              <article key={r.id} className="reservation-card">
-                <div className="reservation-card__top">
-                  <div>
-                    <ReservationScheduleBlock schedule={schedule} />
-                    <div className="reservation-card__branch">
-                      <strong>{branch.primary}</strong>
-                      {branch.secondary ? <small>{branch.secondary}</small> : null}
+        <>
+          <ReservationFiltersBar
+            idPrefix="prov"
+            showBranchFilter={branchOptions.length > 0}
+            branchOptions={branchOptions}
+            branchId={branchFilter}
+            status={statusFilter}
+            time={timeFilter}
+            sort={sortMode}
+            onBranchId={setBranchFilter}
+            onStatus={setStatusFilter}
+            onTime={setTimeFilter}
+            onSort={setSortMode}
+          />
+          <p className="reservation-filters__meta">
+            Mostrando <strong>{filteredSorted.length}</strong> de {rows.length} reservas
+            {branchFilter !== 'ALL' || statusFilter !== 'ALL' || timeFilter !== 'ALL'
+              ? ' (filtros activos)'
+              : null}
+            .
+          </p>
+
+          {filteredSorted.length === 0 ? (
+            <EmptyState
+              title="Nada coincide con los filtros"
+              description="Probá ampliar sucursal, estado o momento, o restablecé «Todos» en cada lista."
+            />
+          ) : (
+            <div className="reservation-list">
+              {filteredSorted.map((r) => {
+                const schedule = formatReservationSchedule(r.startAt, r.endAt);
+                const statusMeta = getReservationStatusMeta(r.status);
+                const branch = renderBranch(r);
+                const temporal = getReservationTemporalHint(r.startAt, r.endAt);
+                const live = isReservationLiveNow(r);
+                return (
+                  <article
+                    key={r.id}
+                    className={`reservation-card${live ? ' reservation-card--live' : ''}`}
+                  >
+                    <div className="reservation-card__top">
+                      <div className="reservation-card__main-col">
+                        <ReservationStatusBadge meta={statusMeta} />
+                        <ReservationScheduleBlock schedule={schedule} />
+                        {temporal ? (
+                          <span className="reservation-card__temporal">{temporal}</span>
+                        ) : null}
+                        <div className="reservation-card__branch">
+                          <strong>{branch.primary}</strong>
+                          {branch.secondary ? <small>{branch.secondary}</small> : null}
+                        </div>
+                        <p className="reservation-card__ref">Referencia #{r.id}</p>
+                        <div className="provider-customer-ref">
+                          {r.customerUsername?.trim() ? (
+                            <>
+                              Cliente: <strong>@{r.customerUsername.trim()}</strong>
+                              <br />
+                              <span style={{ fontSize: '0.8rem' }}>
+                                ID: <code style={{ color: '#fff' }}>{r.customerId}</code>
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              Cliente ID: <code style={{ color: '#fff' }}>{r.customerId}</code>
+                              <br />
+                              <span style={{ fontSize: '0.8rem' }}>
+                                Sin username en la respuesta (dato antiguo o fallo de enriquecimiento).
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    <p className="reservation-card__ref">Referencia interna · #{r.id}</p>
-                    <p className="provider-customer-ref">
-                      {r.customerUsername?.trim() ? (
-                        <>
-                          Cliente: <strong>@{r.customerUsername.trim()}</strong>
-                          <br />
-                          <span style={{ fontSize: '0.8rem' }}>
-                            ID de cuenta: <code style={{ color: '#fff' }}>{r.customerId}</code>
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          Cliente (ID de cuenta): <code style={{ color: '#fff' }}>{r.customerId}</code>
-                          <br />
-                          <span style={{ fontSize: '0.8rem' }}>
-                            Sin nombre de usuario en la respuesta (reserva antigua o no se pudo enriquecer).
-                          </span>
-                        </>
-                      )}
-                    </p>
-                  </div>
-                  <ReservationStatusBadge meta={statusMeta} />
-                </div>
-                <ReservationLineItems lines={r.lines ?? []} />
-              </article>
-            );
-          })}
-        </div>
+                    <ReservationLineItems lines={r.lines ?? []} />
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

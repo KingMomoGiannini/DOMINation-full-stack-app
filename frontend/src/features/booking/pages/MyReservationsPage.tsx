@@ -5,6 +5,15 @@ import { cancelReservation, getBranches, getMyReservations } from '../../../api'
 import type { Reservation } from '../../../types/booking';
 import { branchesToMap, resolveReservationBranchDisplay } from '../../../utils/branchLookup';
 import { formatReservationSchedule, getReservationStatusMeta } from '../../../utils/reservationDisplay';
+import {
+  getReservationTemporalHint,
+  isReservationLiveNow,
+  reservationMatchesFilters,
+  sortReservations,
+  type ReservationSortMode,
+  type ReservationStatusFilter,
+  type ReservationTimeFilter,
+} from '../../../utils/reservationUi';
 import { Spinner } from '../../../components/ui/Spinner';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { PageHeader } from '../../../components/ui/PageHeader';
@@ -13,12 +22,17 @@ import { QueryErrorPanel } from '../../../components/ui/QueryErrorPanel';
 import { ReservationStatusBadge } from '../../../components/reservations/ReservationStatusBadge';
 import { ReservationScheduleBlock } from '../../../components/reservations/ReservationScheduleBlock';
 import { ReservationLineItems } from '../../../components/reservations/ReservationLineItems';
+import { ReservationFiltersBar } from '../../../components/reservations/ReservationFiltersBar';
 import { getApiErrorMessage } from '../../../utils/apiError';
 
 export function MyReservationsPage() {
   const queryClient = useQueryClient();
   const [confirmId, setConfirmId] = useState<number | null>(null);
   const [cancelSuccess, setCancelSuccess] = useState(false);
+  const [branchFilter, setBranchFilter] = useState<number | 'ALL'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<ReservationStatusFilter>('ALL');
+  const [timeFilter, setTimeFilter] = useState<ReservationTimeFilter>('ALL');
+  const [sortMode, setSortMode] = useState<ReservationSortMode>('START_DESC');
 
   const listQuery = useQuery({
     queryKey: ['myReservations'],
@@ -33,10 +47,15 @@ export function MyReservationsPage() {
   const branchesQuery = useQuery({
     queryKey: ['branches'],
     queryFn: getBranches,
-    enabled: (listQuery.data?.length ?? 0) > 0 && needsBranchCatalog,
+    enabled: listQuery.isSuccess && (listQuery.data?.length ?? 0) > 0,
   });
 
   const branchMap = useMemo(() => branchesToMap(branchesQuery.data ?? []), [branchesQuery.data]);
+
+  const branchOptions = useMemo(
+    () => (branchesQuery.data ?? []).map((b) => ({ id: b.id, name: b.name })),
+    [branchesQuery.data]
+  );
 
   const cancelMutation = useMutation({
     mutationFn: cancelReservation,
@@ -48,11 +67,17 @@ export function MyReservationsPage() {
   });
 
   const reservations = listQuery.data ?? [];
-  const sorted = useMemo(() => {
-    const copy = [...reservations];
-    copy.sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime());
-    return copy;
-  }, [reservations]);
+
+  const filteredSorted = useMemo(() => {
+    const filtered = reservations.filter((r) =>
+      reservationMatchesFilters(r, {
+        branchId: branchFilter,
+        status: statusFilter,
+        time: timeFilter,
+      })
+    );
+    return sortReservations(filtered, sortMode);
+  }, [reservations, branchFilter, statusFilter, timeFilter, sortMode]);
 
   const cancelError =
     cancelMutation.error &&
@@ -69,20 +94,33 @@ export function MyReservationsPage() {
       'Sincronizando nombre con el catálogo público…'
     );
 
+  const confirmReservation = confirmId != null ? reservations.find((r) => r.id === confirmId) : null;
+
   return (
     <div className="main-content">
       <PageHeader
         title="Mis"
         highlight="reservas"
-        subtitle="Franjas confirmadas y pendientes. Las fechas se muestran en tu zona horaria local."
+        subtitle="Franjas confirmadas y pendientes. Fechas en tu zona horaria local."
       />
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
+        <Link to="/reservations/new" className="btn btn-success">
+          Nueva reserva
+        </Link>
+      </div>
 
       {cancelSuccess && (
         <div className="alert alert-success alert--stack" role="status">
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', width: '100%' }}>
             <strong>Reserva cancelada</strong>
-            <span>El estado se actualizó. Podés crear una nueva desde «Nueva reserva».</span>
-            <button type="button" className="btn btn-secondary" style={{ alignSelf: 'flex-start', marginTop: '0.25rem' }} onClick={() => setCancelSuccess(false)}>
+            <span>El estado quedó actualizado en el servidor. Podés reservar otra franja cuando quieras.</span>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              style={{ alignSelf: 'flex-start', marginTop: '0.25rem' }}
+              onClick={() => setCancelSuccess(false)}
+            >
               Entendido
             </button>
           </div>
@@ -111,7 +149,7 @@ export function MyReservationsPage() {
 
       {listQuery.isPending ? (
         <Spinner label="Cargando tus reservas…" />
-      ) : sorted.length === 0 ? (
+      ) : reservations.length === 0 ? (
         <EmptyState
           title="Todavía no tenés reservas"
           description="Cuando confirmes una franja desde «Nueva reserva», aparecerá acá con fecha clara y estado."
@@ -121,47 +159,92 @@ export function MyReservationsPage() {
           </Link>
         </EmptyState>
       ) : (
-        <div className="reservation-list">
-          {sorted.map((r) => {
-            const schedule = formatReservationSchedule(r.startAt, r.endAt);
-            const statusMeta = getReservationStatusMeta(r.status);
-            const branch = renderBranch(r);
-            return (
-              <article key={r.id} className="reservation-card">
-                <div className="reservation-card__top">
-                  <div>
-                    <ReservationScheduleBlock schedule={schedule} />
-                    <div className="reservation-card__branch">
-                      <strong>{branch.primary}</strong>
-                      {branch.secondary ? <small>{branch.secondary}</small> : null}
-                    </div>
-                    <p className="reservation-card__ref">Referencia interna · #{r.id}</p>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
-                    <ReservationStatusBadge meta={statusMeta} />
-                    {canCancel(r) && (
-                      <button
-                        type="button"
-                        className="btn btn-logout"
-                        disabled={cancelMutation.isPending}
-                        onClick={() => setConfirmId(r.id)}
+        <>
+          <ReservationFiltersBar
+            idPrefix="my"
+            showBranchFilter={branchOptions.length > 0}
+            branchOptions={branchOptions}
+            branchId={branchFilter}
+            status={statusFilter}
+            time={timeFilter}
+            sort={sortMode}
+            onBranchId={setBranchFilter}
+            onStatus={setStatusFilter}
+            onTime={setTimeFilter}
+            onSort={setSortMode}
+          />
+          <p className="reservation-filters__meta">
+            Mostrando <strong>{filteredSorted.length}</strong> de {reservations.length} reservas.
+          </p>
+
+          {filteredSorted.length === 0 ? (
+            <EmptyState
+              title="Nada coincide con los filtros"
+              description="Ajustá sucursal, estado o momento, o elegí «Todos» en cada lista."
+            />
+          ) : (
+            <div className="reservation-list">
+              {filteredSorted.map((r) => {
+                const schedule = formatReservationSchedule(r.startAt, r.endAt);
+                const statusMeta = getReservationStatusMeta(r.status);
+                const branch = renderBranch(r);
+                const temporal = getReservationTemporalHint(r.startAt, r.endAt);
+                const live = isReservationLiveNow(r);
+                return (
+                  <article
+                    key={r.id}
+                    className={`reservation-card${live ? ' reservation-card--live' : ''}`}
+                  >
+                    <div className="reservation-card__top">
+                      <div className="reservation-card__main-col">
+                        <ReservationStatusBadge meta={statusMeta} />
+                        <ReservationScheduleBlock schedule={schedule} />
+                        {temporal ? (
+                          <span className="reservation-card__temporal">{temporal}</span>
+                        ) : null}
+                        <div className="reservation-card__branch">
+                          <strong>{branch.primary}</strong>
+                          {branch.secondary ? <small>{branch.secondary}</small> : null}
+                        </div>
+                        <p className="reservation-card__ref">Referencia #{r.id}</p>
+                      </div>
+                      <div
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'flex-end',
+                          gap: '0.5rem',
+                        }}
                       >
-                        Cancelar reserva
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <ReservationLineItems lines={r.lines ?? []} />
-              </article>
-            );
-          })}
-        </div>
+                        {canCancel(r) && (
+                          <button
+                            type="button"
+                            className="btn btn-logout"
+                            disabled={cancelMutation.isPending}
+                            onClick={() => setConfirmId(r.id)}
+                          >
+                            Cancelar reserva
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <ReservationLineItems lines={r.lines ?? []} />
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
 
       <ConfirmDialog
         open={confirmId !== null}
         title="¿Cancelar esta reserva?"
-        description="Esta acción marca la reserva como cancelada. Podés crear una nueva reserva después si lo necesitás."
+        description={
+          confirmReservation
+            ? `Se marcará como cancelada la reserva #${confirmReservation.id} (${formatReservationSchedule(confirmReservation.startAt, confirmReservation.endAt).headline}).`
+            : 'Esta acción marca la reserva como cancelada.'
+        }
         confirmLabel={cancelMutation.isPending ? 'Cancelando…' : 'Sí, cancelar'}
         cancelLabel="Volver"
         danger

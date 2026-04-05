@@ -1,18 +1,20 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
 import {
   createBranch,
   createRoom,
   deleteBranch,
   getItems,
   getMyBranches,
+  getProviderReservations,
   setBranchActive,
   updateBranch,
   type CreateBranchRequest,
   type CreateRoomRequest,
 } from '../../../api';
 import type { Branch, Item } from '../../../types/catalog';
+import { ProviderAreaNav } from '../../../components/provider/ProviderAreaNav';
+import { ProviderStatsSummary } from '../../../components/provider/ProviderStatsSummary';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { Spinner } from '../../../components/ui/Spinner';
 import { EmptyState } from '../../../components/ui/EmptyState';
@@ -21,6 +23,7 @@ import { getApiErrorMessage } from '../../../utils/apiError';
 
 export function ProviderDashboardPage() {
   const queryClient = useQueryClient();
+  const [actionBanner, setActionBanner] = useState<{ message: string } | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [showBranchForm, setShowBranchForm] = useState(false);
   const [showRoomForm, setShowRoomForm] = useState(false);
@@ -34,6 +37,47 @@ export function ProviderDashboardPage() {
     queryFn: getMyBranches,
   });
 
+  const reservationsSummaryQuery = useQuery({
+    queryKey: ['providerReservations'],
+    queryFn: getProviderReservations,
+  });
+
+  const branchIds = useMemo(() => (branchesQuery.data ?? []).map((b) => b.id), [branchesQuery.data]);
+
+  const roomsCountQuery = useQuery({
+    queryKey: ['providerRoomsTotal', branchIds],
+    queryFn: async () => {
+      const lists = await Promise.all(branchIds.map((id) => getItems(id, 'ROOM')));
+      return lists.reduce((acc, arr) => acc + arr.length, 0);
+    },
+    enabled: branchIds.length > 0 && branchesQuery.isSuccess,
+  });
+
+  const reservationStats = useMemo(() => {
+    const list = reservationsSummaryQuery.data ?? [];
+    const now = Date.now();
+    let cancelled = 0;
+    let upcoming = 0;
+    let past = 0;
+    for (const r of list) {
+      if (r.status === 'CANCELLED') {
+        cancelled++;
+        continue;
+      }
+      const end = new Date(r.endAt).getTime();
+      if (Number.isNaN(end)) continue;
+      if (end >= now) upcoming++;
+      else past++;
+    }
+    return { total: list.length, upcoming, past, cancelled };
+  }, [reservationsSummaryQuery.data]);
+
+  const branchStats = useMemo(() => {
+    const list = branchesQuery.data ?? [];
+    const active = list.filter((b) => b.active).length;
+    return { total: list.length, active, inactive: list.length - active };
+  }, [branchesQuery.data]);
+
   const roomsQuery = useQuery({
     queryKey: ['providerRooms', selectedId],
     queryFn: () => getItems(selectedId as number, 'ROOM'),
@@ -42,8 +86,11 @@ export function ProviderDashboardPage() {
 
   const createBranchMut = useMutation({
     mutationFn: createBranch,
-    onSuccess: () => {
+    onSuccess: (_data, vars) => {
       queryClient.invalidateQueries({ queryKey: ['providerBranches'] });
+      queryClient.invalidateQueries({ queryKey: ['providerReservations'] });
+      queryClient.invalidateQueries({ queryKey: ['providerRoomsTotal'] });
+      setActionBanner({ message: `Sucursal «${vars.name}» creada correctamente.` });
       setShowBranchForm(false);
       setBranchForm({ name: '', address: '' });
     },
@@ -51,8 +98,10 @@ export function ProviderDashboardPage() {
 
   const updateBranchMut = useMutation({
     mutationFn: ({ id, body }: { id: number; body: CreateBranchRequest }) => updateBranch(id, body),
-    onSuccess: () => {
+    onSuccess: (_data, vars) => {
       queryClient.invalidateQueries({ queryKey: ['providerBranches'] });
+      queryClient.invalidateQueries({ queryKey: ['providerReservations'] });
+      setActionBanner({ message: `Datos de «${vars.body.name}» actualizados.` });
       setEditingId(null);
     },
   });
@@ -61,21 +110,36 @@ export function ProviderDashboardPage() {
     mutationFn: deleteBranch,
     onSuccess: (_d, deletedId) => {
       queryClient.invalidateQueries({ queryKey: ['providerBranches'] });
+      queryClient.invalidateQueries({ queryKey: ['providerReservations'] });
+      queryClient.invalidateQueries({ queryKey: ['providerRoomsTotal'] });
       queryClient.removeQueries({ queryKey: ['providerRooms', deletedId] });
       setSelectedId((cur) => (cur === deletedId ? null : cur));
       setDeleteTargetId(null);
+      setActionBanner({ message: 'Sucursal eliminada del catálogo.' });
     },
   });
 
   const toggleActiveMut = useMutation({
     mutationFn: ({ id, active }: { id: number; active: boolean }) => setBranchActive(id, active),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['providerBranches'] }),
+    onSuccess: (_d, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['providerBranches'] });
+      queryClient.invalidateQueries({ queryKey: ['providerReservations'] });
+      setActionBanner({
+        message: vars.active
+          ? 'Sucursal activada: visible según reglas del catálogo.'
+          : 'Sucursal desactivada.',
+      });
+    },
   });
 
   const createRoomMut = useMutation({
     mutationFn: ({ branchId, body }: { branchId: number; body: CreateRoomRequest }) => createRoom(branchId, body),
     onSuccess: (_d, vars) => {
       queryClient.invalidateQueries({ queryKey: ['providerRooms', vars.branchId] });
+      queryClient.invalidateQueries({ queryKey: ['providerRoomsTotal'] });
+      setActionBanner({
+        message: `Sala «${vars.body.name}» creada en la sucursal seleccionada.`,
+      });
       setShowRoomForm(false);
       setRoomForm({ name: '', hourlyPrice: 0 });
     },
@@ -105,6 +169,7 @@ export function ProviderDashboardPage() {
   ]);
 
   const selectedBranch = branches.find((b) => b.id === selectedId) ?? null;
+  const deleteTargetBranch = deleteTargetId != null ? branches.find((b) => b.id === deleteTargetId) : null;
 
   const startEdit = (b: Branch) => {
     setEditingId(b.id);
@@ -140,9 +205,37 @@ export function ProviderDashboardPage() {
         subtitle="Sucursales, estado activo/inactivo y salas (ítems tipo ROOM) según el catálogo."
       />
 
-      <p style={{ marginBottom: '1rem' }}>
-        <Link to="/provider/reservations">Ver reservas en mis sucursales</Link>
-      </p>
+      <ProviderAreaNav />
+
+      {actionBanner && (
+        <div className="alert alert-success alert--stack" role="status">
+          <strong>Listo</strong>
+          <p style={{ marginTop: '0.35rem', marginBottom: 0 }}>{actionBanner.message}</p>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ marginTop: '0.65rem' }}
+            onClick={() => setActionBanner(null)}
+          >
+            Cerrar aviso
+          </button>
+        </div>
+      )}
+
+      {branches.length > 0 && (
+        <ProviderStatsSummary
+          branchesTotal={branchStats.total}
+          branchesActive={branchStats.active}
+          branchesInactive={branchStats.inactive}
+          roomsTotal={roomsCountQuery.data ?? 0}
+          reservationsTotal={reservationStats.total}
+          reservationsUpcoming={reservationStats.upcoming}
+          reservationsPast={reservationStats.past}
+          reservationsCancelled={reservationStats.cancelled}
+          roomsLoading={roomsCountQuery.isPending}
+          reservationsLoading={reservationsSummaryQuery.isPending}
+        />
+      )}
 
       {pageError && <div className="alert alert-error">⚠️ {pageError}</div>}
 
@@ -397,7 +490,11 @@ export function ProviderDashboardPage() {
       <ConfirmDialog
         open={deleteTargetId != null}
         title="¿Eliminar esta sucursal?"
-        description="Se elimina la sucursal en el catálogo. Asegurate de que no tenga dependencias críticas en producción."
+        description={
+          deleteTargetBranch
+            ? `Se eliminará «${deleteTargetBranch.name}» del catálogo. Las reservas históricas pueden seguir mostrando su id; esta acción no las borra.`
+            : 'Se elimina la sucursal en el catálogo.'
+        }
         confirmLabel="Sí, eliminar"
         cancelLabel="Cancelar"
         danger
