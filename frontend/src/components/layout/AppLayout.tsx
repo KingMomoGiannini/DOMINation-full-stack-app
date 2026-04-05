@@ -1,4 +1,4 @@
-import { Link, Outlet } from 'react-router-dom';
+import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../../features/auth/AuthContext';
 
 export function AppLayout() {
@@ -35,7 +35,14 @@ export function AppLayout() {
                     <Link to="/provider/reservations">Reservas sucursales</Link>
                   </>
                 )}
-                {showAdmin && <Link to="/admin/provider-requests">Admin solicitudes</Link>}
+                {showAdmin && (
+                  <NavLink
+                    to="/admin/provider-requests"
+                    className={({ isActive }) => (isActive ? 'navbar-link-active' : undefined)}
+                  >
+                    Moderación prestadores
+                  </NavLink>
+                )}
                 {showProviderRequest && <Link to="/provider-request">Ser prestador</Link>}
                 <div className="user-info">
                   <span>👤 {username}</span>

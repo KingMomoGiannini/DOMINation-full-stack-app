@@ -119,6 +119,15 @@ body {
   transform: translateY(-2px);
 }
 
+.navbar-links a.navbar-link-active {
+  color: var(--primary);
+  text-shadow: 0 0 12px rgba(255, 14, 14, 0.65);
+}
+
+.navbar-links a.navbar-link-active::after {
+  width: 100%;
+}
+
 .user-info {
   font-family: 'Bebas Neue', sans-serif;
   display: flex;
@@ -945,5 +954,196 @@ body {
 .reservation-card__main-col {
   flex: 1;
   min-width: 0;
+}
+
+/* Área admin — solicitudes prestador */
+.admin-area-intro {
+  font-family: 'Arial', sans-serif;
+  font-size: 0.9rem;
+  color: var(--gray-light);
+  line-height: 1.5;
+  margin: -1rem 0 1.5rem;
+  max-width: 52rem;
+}
+
+.admin-area-intro code {
+  font-size: 0.85em;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.admin-pr-toolbar {
+  margin-bottom: 0.5rem;
+}
+
+.admin-pr-toolbar .filters-container {
+  margin-bottom: 0;
+}
+
+.admin-pr-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.admin-pr-tab-count {
+  font-family: 'Arial', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--gray-light);
+  margin-left: 0.25rem;
+}
+
+.filter-btn.active .admin-pr-tab-count {
+  background: rgba(255, 14, 14, 0.35);
+  color: #fff;
+}
+
+.admin-pr-filters.admin-pr-filters {
+  margin-top: 1rem;
+}
+
+.admin-pr-filters__meta strong {
+  color: #fff;
+}
+
+.admin-pr-hint-warn {
+  color: var(--warning);
+}
+
+.admin-pr-input {
+  font-family: 'Arial', sans-serif;
+  font-size: 0.95rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: var(--secondary);
+  color: #fff;
+  min-width: 140px;
+}
+
+.admin-pr-list.cards-grid {
+  margin-top: 1.5rem;
+}
+
+.admin-pr-card {
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.admin-pr-card:hover {
+  transform: translateY(-4px) scale(1.01);
+}
+
+.admin-pr-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.admin-pr-card__title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.85rem;
+  letter-spacing: 1px;
+  margin: 0;
+  color: #fff;
+}
+
+.admin-pr-card__subtitle {
+  font-family: 'Arial', sans-serif;
+  font-size: 0.9rem;
+  color: var(--gray-light);
+  margin: 0.35rem 0 0;
+}
+
+.admin-pr-meta {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0 0 1.25rem;
+  flex: 1;
+}
+
+.admin-pr-meta dt {
+  font-family: 'Arial', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--gray-light);
+  margin: 0 0 0.2rem;
+}
+
+.admin-pr-meta dd {
+  font-family: 'Arial', sans-serif;
+  font-size: 0.95rem;
+  color: #e8e8e8;
+  margin: 0;
+  line-height: 1.45;
+}
+
+.admin-pr-meta--full {
+  grid-column: 1 / -1;
+}
+
+.admin-pr-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: auto;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.admin-pr-card__readonly {
+  font-family: 'Arial', sans-serif;
+  font-size: 0.85rem;
+  color: var(--gray-light);
+  font-style: italic;
+  margin: 0;
+  padding-top: 0.75rem;
+}
+
+.admin-pr-badge {
+  font-family: 'Bebas Neue', sans-serif;
+  flex-shrink: 0;
+  padding: 0.35rem 1rem;
+  border-radius: 999px;
+  font-size: 1rem;
+  letter-spacing: 1px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+}
+
+.admin-pr-badge--pending {
+  background: rgba(255, 136, 0, 0.25);
+  color: #ffcc80;
+  border-color: rgba(255, 136, 0, 0.5);
+}
+
+.admin-pr-badge--approved {
+  background: rgba(0, 160, 0, 0.22);
+  color: #8fef9a;
+  border-color: rgba(0, 200, 80, 0.45);
+}
+
+.admin-pr-badge--rejected {
+  background: rgba(180, 40, 40, 0.35);
+  color: #ffb3b3;
+  border-color: rgba(255, 80, 80, 0.45);
+}
+
+.admin-pr-badge--unknown {
+  background: var(--secondary-light);
+  color: var(--gray-light);
 }
 

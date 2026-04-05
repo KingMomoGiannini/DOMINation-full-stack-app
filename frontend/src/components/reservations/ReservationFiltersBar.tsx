@@ -87,7 +87,7 @@ export function ReservationFiltersBar({
           onChange={(e) => onSort(e.target.value as ReservationSortMode)}
         >
           <option value="START_DESC">Fecha: más reciente primero</option>
-          <option value="START_ASC">Fecha: más próxima primero</option>
+          <option value="START_ASC">Fecha: más lejana primero</option>
         </select>
       </div>
     </div>
