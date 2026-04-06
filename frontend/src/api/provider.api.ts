@@ -1,4 +1,5 @@
 import type { Branch, Item } from '../types/catalog';
+import type { PageResponse } from '../types/page';
 import { http } from './http';
 
 export interface CreateBranchRequest {
@@ -65,11 +66,42 @@ export const getMyProviderRequest = async (): Promise<ProviderRequestResponse | 
 
 export type AdminProviderRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
-export const getAdminProviderRequests = async (
-  status?: AdminProviderRequestStatus
-): Promise<ProviderRequestResponse[]> => {
-  const qs = status != null ? `?status=${encodeURIComponent(status)}` : '';
-  const { data } = await http.get<ProviderRequestResponse[]>(`/admin/provider-requests${qs}`);
+export interface AdminProviderRequestsQuery {
+  page?: number;
+  size?: number;
+  status?: AdminProviderRequestStatus | 'ALL';
+  userId?: number;
+  sort?: string;
+}
+
+export interface AdminProviderRequestSummary {
+  total: number;
+  pending: number;
+  approved: number;
+  rejected: number;
+}
+
+export const getAdminProviderRequestSummary = async (): Promise<AdminProviderRequestSummary> => {
+  const { data } = await http.get<AdminProviderRequestSummary>('/admin/provider-requests/summary');
+  return data;
+};
+
+export const getAdminProviderRequestsPage = async (
+  q: AdminProviderRequestsQuery
+): Promise<PageResponse<ProviderRequestResponse>> => {
+  const params = new URLSearchParams();
+  params.set('page', String(q.page ?? 0));
+  params.set('size', String(q.size ?? 20));
+  params.set('sort', q.sort ?? 'createdAt,desc');
+  if (q.userId != null && !Number.isNaN(q.userId)) {
+    params.set('userId', String(q.userId));
+  }
+  if (q.status != null && q.status !== 'ALL') {
+    params.set('status', q.status);
+  }
+  const { data } = await http.get<PageResponse<ProviderRequestResponse>>(
+    `/admin/provider-requests?${params.toString()}`
+  );
   return data;
 };
 

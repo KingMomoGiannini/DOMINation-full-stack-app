@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   approveProviderRequest,
-  getAdminProviderRequests,
+  getAdminProviderRequestSummary,
+  getAdminProviderRequestsPage,
   rejectProviderRequest,
   type ProviderRequestResponse,
 } from '../../../api';
@@ -13,13 +14,9 @@ import { EmptyState } from '../../../components/ui/EmptyState';
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
 import { QueryErrorPanel } from '../../../components/ui/QueryErrorPanel';
 import { getApiErrorMessage } from '../../../utils/apiError';
-import {
-  filterProviderRequestsByTab,
-  filterProviderRequestsByUserQuery,
-  sortProviderRequests,
-  type AdminRequestSortMode,
-  type AdminRequestStatusTab,
-} from '../../../utils/adminProviderRequestUi';
+
+type AdminRequestSortMode = 'CREATED_DESC' | 'CREATED_ASC';
+type AdminRequestStatusTab = 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED';
 
 function statusLabel(s?: string): string {
   if (s === 'PENDING') return 'Pendiente';
@@ -40,34 +37,54 @@ export function AdminProviderRequestsPage() {
   const [statusTab, setStatusTab] = useState<AdminRequestStatusTab>('PENDING');
   const [userQuery, setUserQuery] = useState('');
   const [sortMode, setSortMode] = useState<AdminRequestSortMode>('CREATED_DESC');
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(20);
   const [confirmApprove, setConfirmApprove] = useState<ProviderRequestResponse | null>(null);
   const [confirmReject, setConfirmReject] = useState<ProviderRequestResponse | null>(null);
   const [actionBanner, setActionBanner] = useState<string | null>(null);
 
-  const listQuery = useQuery({
-    queryKey: ['adminProviderRequests'],
-    queryFn: () => getAdminProviderRequests(),
+  const userFilterInvalid = userQuery.trim().length > 0 && !/^\d+$/.test(userQuery.trim());
+  const userIdParsed = useMemo(() => {
+    const t = userQuery.trim();
+    if (!t || !/^\d+$/.test(t)) return undefined;
+    const n = Number(t);
+    return Number.isSafeInteger(n) ? n : undefined;
+  }, [userQuery]);
+
+  const listParams = useMemo(
+    () => ({
+      page,
+      size: pageSize,
+      status: statusTab,
+      userId: userIdParsed,
+      sort: sortMode === 'CREATED_ASC' ? 'createdAt,asc' : 'createdAt,desc',
+    }),
+    [page, pageSize, statusTab, userIdParsed, sortMode]
+  );
+
+  useEffect(() => {
+    setPage(0);
+  }, [statusTab, userQuery, sortMode, pageSize]);
+
+  const summaryQuery = useQuery({
+    queryKey: ['adminProviderRequestSummary'],
+    queryFn: getAdminProviderRequestSummary,
   });
 
-  const allRows: ProviderRequestResponse[] = listQuery.data ?? [];
+  const listQuery = useQuery({
+    queryKey: ['adminProviderRequests', listParams],
+    queryFn: () => getAdminProviderRequestsPage(listParams),
+    placeholderData: (p) => p,
+  });
 
-  const userFilterInvalid = userQuery.trim().length > 0 && !/^\d+$/.test(userQuery.trim());
-
-  const { byUser, displayRows, tabCount } = useMemo(() => {
-    const tabbed = filterProviderRequestsByTab(allRows, statusTab);
-    const userFiltered = userFilterInvalid ? tabbed : filterProviderRequestsByUserQuery(tabbed, userQuery);
-    const sorted = sortProviderRequests(userFiltered, sortMode);
-    return {
-      byUser: userFiltered,
-      displayRows: sorted,
-      tabCount: tabbed.length,
-    };
-  }, [allRows, statusTab, userQuery, sortMode, userFilterInvalid]);
+  const displayRows = listQuery.data?.content ?? [];
+  const pg = listQuery.data;
 
   const approveMut = useMutation({
     mutationFn: approveProviderRequest,
     onSuccess: (_void, id) => {
       queryClient.invalidateQueries({ queryKey: ['adminProviderRequests'] });
+      queryClient.invalidateQueries({ queryKey: ['adminProviderRequestSummary'] });
       setConfirmApprove(null);
       setActionBanner(
         `Solicitud #${id} aprobada. El usuario recibió el rol de prestador y debe volver a iniciar sesión para actualizar el token.`
@@ -82,6 +99,7 @@ export function AdminProviderRequestsPage() {
     mutationFn: rejectProviderRequest,
     onSuccess: (_void, id) => {
       queryClient.invalidateQueries({ queryKey: ['adminProviderRequests'] });
+      queryClient.invalidateQueries({ queryKey: ['adminProviderRequestSummary'] });
       setConfirmReject(null);
       setActionBanner(`Solicitud #${id} rechazada. Quedó registrada con estado rechazado.`);
     },
@@ -106,31 +124,24 @@ export function AdminProviderRequestsPage() {
     { key: 'ALL', label: 'Todas' },
   ];
 
-  const counts = useMemo(() => {
-    let p = 0,
-      a = 0,
-      r = 0;
-    for (const row of allRows) {
-      if (row.status === 'PENDING') p += 1;
-      else if (row.status === 'APPROVED') a += 1;
-      else if (row.status === 'REJECTED') r += 1;
-    }
-    return { p, a, r, all: allRows.length };
-  }, [allRows]);
+  const counts = summaryQuery.data;
 
   const tabCountBadge = (key: AdminRequestStatusTab) => {
-    if (key === 'PENDING') return counts.p;
-    if (key === 'APPROVED') return counts.a;
-    if (key === 'REJECTED') return counts.r;
-    return counts.all;
+    if (!counts) return '—';
+    if (key === 'PENDING') return counts.pending;
+    if (key === 'APPROVED') return counts.approved;
+    if (key === 'REJECTED') return counts.rejected;
+    return counts.total;
   };
+
+  const listInitialLoading = listQuery.isPending && !listQuery.data;
 
   return (
     <div className="main-content">
       <PageHeader
         title="Moderación ·"
         highlight="solicitudes prestador"
-        subtitle="Revisá pedidos de rol PROVIDER. Las acciones aplican a la solicitud indicada; los totales reflejan la última carga del servidor."
+        subtitle="Listado paginado en servidor: filtro por estado, ID de usuario exacto y orden por fecha de alta. Los totales del resumen vienen de un endpoint liviano."
       />
 
       <p className="admin-area-intro">
@@ -161,7 +172,7 @@ export function AdminProviderRequestsPage() {
         />
       )}
 
-      <AdminProviderRequestStats rows={allRows} loading={listQuery.isPending} />
+      <AdminProviderRequestStats summary={summaryQuery.data} loading={summaryQuery.isPending} />
 
       {!listQuery.isError && (
         <>
@@ -184,7 +195,7 @@ export function AdminProviderRequestsPage() {
 
             <div className="reservation-filters admin-pr-filters">
               <div className="reservation-filters__field">
-                <label htmlFor="admin-pr-user-filter">Usuario (ID numérico)</label>
+                <label htmlFor="admin-pr-user-filter">Usuario (ID exacto)</label>
                 <input
                   id="admin-pr-user-filter"
                   type="text"
@@ -203,51 +214,94 @@ export function AdminProviderRequestsPage() {
                   value={sortMode}
                   onChange={(e) => setSortMode(e.target.value as AdminRequestSortMode)}
                 >
-                  <option value="CREATED_DESC">Más recientes primero</option>
-                  <option value="CREATED_ASC">Más antiguas primero</option>
+                  <option value="CREATED_DESC">Alta: más recientes primero</option>
+                  <option value="CREATED_ASC">Alta: más antiguas primero</option>
+                </select>
+              </div>
+              <div className="reservation-filters__field">
+                <label htmlFor="admin-pr-page-size">Por página</label>
+                <select
+                  id="admin-pr-page-size"
+                  value={String(pageSize)}
+                  onChange={(e) => setPageSize(Number(e.target.value))}
+                >
+                  <option value="10">10</option>
+                  <option value="20">20</option>
+                  <option value="50">50</option>
                 </select>
               </div>
               <p className="reservation-filters__meta admin-pr-filters__meta">
-                Mostrando <strong>{displayRows.length}</strong> de <strong>{tabCount}</strong> en esta pestaña
+                Página <strong>{(pg?.number ?? 0) + 1}</strong> de <strong>{Math.max(pg?.totalPages ?? 1, 1)}</strong> ·{' '}
+                <strong>{pg?.numberOfElements ?? displayRows.length}</strong> fila(s) en esta página ·{' '}
+                <strong>{pg?.totalElements ?? 0}</strong> resultado(s) con filtros actuales
                 {userFilterInvalid ? (
                   <>
                     {' '}
-                    · <span className="admin-pr-hint-warn">El filtro por usuario acepta solo dígitos.</span>
+                    · <span className="admin-pr-hint-warn">El filtro por usuario acepta solo dígitos (ID exacto).</span>
                   </>
                 ) : null}
-                {userQuery.trim() && !userFilterInvalid && byUser.length === 0 && tabCount > 0 ? (
+                {listQuery.isFetching && !listInitialLoading ? (
                   <>
                     {' '}
-                    · Ningún usuario coincide con «{userQuery.trim()}» en esta pestaña.
+                    · <span className="admin-pr-hint-warn">Actualizando…</span>
                   </>
                 ) : null}
               </p>
             </div>
           </div>
 
-          {listQuery.isPending ? (
+          <nav className="pagination-bar" aria-label="Páginas de solicitudes">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={pg?.first !== false}
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+            >
+              Anterior
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={pg?.last !== false}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Siguiente
+            </button>
+          </nav>
+
+          {listInitialLoading ? (
             <Spinner label="Cargando solicitudes…" />
-          ) : displayRows.length === 0 ? (
+          ) : (pg?.totalElements ?? 0) === 0 ? (
             <EmptyState
-              title={allRows.length === 0 ? 'No hay solicitudes' : 'Nada que mostrar con estos filtros'}
+              title={summaryQuery.data?.total === 0 ? 'No hay solicitudes' : 'Nada coincide con estos filtros'}
               description={
-                allRows.length === 0
+                summaryQuery.data?.total === 0
                   ? 'Cuando los usuarios envíen pedidos de rol prestador, aparecerán acá.'
-                  : 'Probá otra pestaña, vaciá el filtro por usuario u ordená distinto.'
+                  : 'Probá otra pestaña, quitá el filtro por usuario o cambiá la página.'
               }
             >
-              {allRows.length > 0 && (userQuery.trim() || statusTab !== 'PENDING') ? (
+              {summaryQuery.data != null && summaryQuery.data.total > 0 ? (
                 <button
                   type="button"
                   className="btn btn-primary"
                   onClick={() => {
                     setUserQuery('');
                     setStatusTab('ALL');
+                    setPage(0);
                   }}
                 >
-                  Ver todas las solicitudes
+                  Quitar filtro de usuario y ver todas
                 </button>
               ) : null}
+            </EmptyState>
+          ) : displayRows.length === 0 ? (
+            <EmptyState
+              title="Página sin filas"
+              description="Esta página está vacía. Volvé atrás o cambiá el tamaño de página."
+            >
+              <button type="button" className="btn btn-primary" onClick={() => setPage(0)}>
+                Ir a la primera página
+              </button>
             </EmptyState>
           ) : (
             <ul className="admin-pr-list cards-grid" style={{ listStyle: 'none', marginTop: '1rem' }}>

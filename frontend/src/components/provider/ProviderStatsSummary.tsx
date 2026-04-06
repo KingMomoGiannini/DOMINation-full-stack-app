@@ -51,7 +51,7 @@ export function ProviderStatsSummary({
           )}
         </div>
         <div className="provider-stat-card">
-          <span className="provider-stat-card__label">Reservas listadas</span>
+          <span className="provider-stat-card__label">Reservas</span>
           {reservationsLoading ? (
             <span className="provider-stat-card__loading" aria-busy="true">
               Cargando…
@@ -61,7 +61,7 @@ export function ProviderStatsSummary({
               <span className="provider-stat-card__value">{reservationsTotal}</span>
               <span className="provider-stat-card__hint">
                 {reservationsUpcoming} próximas/vigentes · {reservationsPast} pasadas · {reservationsCancelled}{' '}
-                canceladas
+                canceladas (conteos en servidor)
               </span>
             </>
           )}

@@ -17,6 +17,12 @@ interface ReservationFiltersBarProps {
   onSort: (v: ReservationSortMode) => void;
   showBranchFilter: boolean;
   idPrefix: string;
+  /** Ventana opcional (solape con franjas de reserva) — solo si el backend acepta from/to. */
+  showWindowFilter?: boolean;
+  windowFrom?: string;
+  windowTo?: string;
+  onWindowFrom?: (v: string) => void;
+  onWindowTo?: (v: string) => void;
 }
 
 export function ReservationFiltersBar({
@@ -31,6 +37,11 @@ export function ReservationFiltersBar({
   onSort,
   showBranchFilter,
   idPrefix,
+  showWindowFilter = false,
+  windowFrom = '',
+  windowTo = '',
+  onWindowFrom,
+  onWindowTo,
 }: ReservationFiltersBarProps) {
   return (
     <div className="reservation-filters" role="search" aria-label="Filtros de reservas">
@@ -90,6 +101,30 @@ export function ReservationFiltersBar({
           <option value="START_ASC">Fecha: más lejana primero</option>
         </select>
       </div>
+      {showWindowFilter && onWindowFrom && onWindowTo ? (
+        <>
+          <div className="reservation-filters__field">
+            <label htmlFor={`${idPrefix}-win-from`}>Ventana desde</label>
+            <input
+              id={`${idPrefix}-win-from`}
+              type="datetime-local"
+              className="admin-pr-input"
+              value={windowFrom}
+              onChange={(e) => onWindowFrom(e.target.value)}
+            />
+          </div>
+          <div className="reservation-filters__field">
+            <label htmlFor={`${idPrefix}-win-to`}>Ventana hasta</label>
+            <input
+              id={`${idPrefix}-win-to`}
+              type="datetime-local"
+              className="admin-pr-input"
+              value={windowTo}
+              onChange={(e) => onWindowTo(e.target.value)}
+            />
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }

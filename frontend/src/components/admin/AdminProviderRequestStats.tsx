@@ -1,13 +1,15 @@
-import type { ProviderRequestResponse } from '../../api';
-import { countProviderRequestsByStatus } from '../../utils/adminProviderRequestUi';
+import type { AdminProviderRequestSummary } from '../../api';
 
 interface AdminProviderRequestStatsProps {
-  rows: ProviderRequestResponse[];
+  summary: AdminProviderRequestSummary | undefined;
   loading: boolean;
 }
 
-export function AdminProviderRequestStats({ rows, loading }: AdminProviderRequestStatsProps) {
-  const { total, pending, approved, rejected } = countProviderRequestsByStatus(rows);
+export function AdminProviderRequestStats({ summary, loading }: AdminProviderRequestStatsProps) {
+  const total = summary?.total ?? 0;
+  const pending = summary?.pending ?? 0;
+  const approved = summary?.approved ?? 0;
+  const rejected = summary?.rejected ?? 0;
 
   return (
     <section className="admin-pr-stats provider-stats-summary" aria-label="Resumen de solicitudes">
@@ -20,7 +22,7 @@ export function AdminProviderRequestStats({ rows, loading }: AdminProviderReques
           ) : (
             <span className="provider-stat-card__value">{total}</span>
           )}
-          <span className="provider-stat-card__hint">Todas las solicitudes devueltas por el servidor en esta carga.</span>
+          <span className="provider-stat-card__hint">Conteos globales (endpoint /summary).</span>
         </div>
         <div className="provider-stat-card">
           <span className="provider-stat-card__label">Pendientes</span>

@@ -7,6 +7,8 @@ import com.domination.booking.dto.AvailabilityConflictDTO;
 import com.domination.booking.dto.AvailabilityResponse;
 import com.domination.booking.dto.CreateReservationLineRequest;
 import com.domination.booking.dto.CreateReservationRequest;
+import com.domination.booking.dto.ProviderReservationMetricsDto;
+import com.domination.booking.dto.ProviderReservationTimeMode;
 import com.domination.booking.dto.ReservationDTO;
 import com.domination.booking.exception.ConflictException;
 import com.domination.booking.exception.InsufficientStockException;
@@ -17,11 +19,17 @@ import com.domination.booking.model.HoldInventoryResponse;
 import com.domination.booking.model.ItemDetailResponse;
 import com.domination.booking.model.ReleaseInventoryRequest;
 import com.domination.booking.repository.ReservationRepository;
+import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -48,15 +56,65 @@ public class ReservationService {
     }
 
     @Transactional(readOnly = true)
-    public List<ReservationDTO> getProviderReservations(Long providerId, String authorizationHeader) {
-        log.debug("Obteniendo reservas del provider: {}", providerId);
+    public Page<ReservationDTO> searchProviderReservations(
+            Long providerId,
+            Long branchId,
+            ReservationStatus status,
+            ProviderReservationTimeMode timeMode,
+            LocalDateTime windowFrom,
+            LocalDateTime windowTo,
+            Pageable pageable,
+            String authorizationHeader) {
+        log.debug(
+                "Listado paginado provider {} branchId={} status={} time={} window=[{},{}] page={}",
+                providerId, branchId, status, timeMode, windowFrom, windowTo, pageable.getPageNumber());
 
-        List<ReservationDTO> list = reservationRepository.findByProviderId(providerId).stream()
+        LocalDateTime now = LocalDateTime.now();
+        Specification<Reservation> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            predicates.add(cb.equal(root.get("providerId"), providerId));
+            if (branchId != null) {
+                predicates.add(cb.equal(root.get("branchId"), branchId));
+            }
+            if (status != null) {
+                predicates.add(cb.equal(root.get("status"), status));
+            }
+            if (timeMode == ProviderReservationTimeMode.UPCOMING) {
+                predicates.add(cb.notEqual(root.get("status"), ReservationStatus.CANCELLED));
+                predicates.add(cb.greaterThanOrEqualTo(root.get("endAt"), now));
+            } else if (timeMode == ProviderReservationTimeMode.PAST) {
+                predicates.add(cb.lessThan(root.get("endAt"), now));
+            }
+            if (windowFrom != null && windowTo != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("startAt"), windowTo));
+                predicates.add(cb.greaterThanOrEqualTo(root.get("endAt"), windowFrom));
+            } else if (windowFrom != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("endAt"), windowFrom));
+            } else if (windowTo != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("startAt"), windowTo));
+            }
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+
+        Page<Reservation> entityPage = reservationRepository.findAll(spec, pageable);
+        List<ReservationDTO> dtos = entityPage.getContent().stream()
                 .map(reservationMapper::toDTO)
                 .collect(Collectors.toList());
-        reservationDtoEnricher.enrichMissingCatalogFields(list);
-        reservationDtoEnricher.enrichCustomerUsernamesForProvider(list, authorizationHeader);
-        return list;
+        reservationDtoEnricher.enrichMissingCatalogFields(dtos);
+        reservationDtoEnricher.enrichCustomerUsernamesForProvider(dtos, authorizationHeader);
+        return new PageImpl<>(dtos, pageable, entityPage.getTotalElements());
+    }
+
+    @Transactional(readOnly = true)
+    public ProviderReservationMetricsDto getProviderReservationMetrics(Long providerId) {
+        LocalDateTime now = LocalDateTime.now();
+        long total = reservationRepository.countByProviderId(providerId);
+        long cancelled = reservationRepository.countByProviderIdAndStatus(providerId, ReservationStatus.CANCELLED);
+        long upcoming = reservationRepository.countByProviderIdAndStatusNotAndEndAtGreaterThanEqual(
+                providerId, ReservationStatus.CANCELLED, now);
+        long past = reservationRepository.countByProviderIdAndStatusNotAndEndAtBefore(
+                providerId, ReservationStatus.CANCELLED, now);
+        return new ProviderReservationMetricsDto(total, cancelled, upcoming, past);
     }
 
     @Transactional

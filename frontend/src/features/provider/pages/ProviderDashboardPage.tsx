@@ -6,7 +6,7 @@ import {
   deleteBranch,
   getItems,
   getMyBranches,
-  getProviderReservations,
+  getProviderReservationMetrics,
   setBranchActive,
   updateBranch,
   type CreateBranchRequest,
@@ -37,9 +37,9 @@ export function ProviderDashboardPage() {
     queryFn: getMyBranches,
   });
 
-  const reservationsSummaryQuery = useQuery({
-    queryKey: ['providerReservations'],
-    queryFn: getProviderReservations,
+  const reservationMetricsQuery = useQuery({
+    queryKey: ['providerReservationMetrics'],
+    queryFn: getProviderReservationMetrics,
   });
 
   const branchIds = useMemo(() => (branchesQuery.data ?? []).map((b) => b.id), [branchesQuery.data]);
@@ -54,23 +54,15 @@ export function ProviderDashboardPage() {
   });
 
   const reservationStats = useMemo(() => {
-    const list = reservationsSummaryQuery.data ?? [];
-    const now = Date.now();
-    let cancelled = 0;
-    let upcoming = 0;
-    let past = 0;
-    for (const r of list) {
-      if (r.status === 'CANCELLED') {
-        cancelled++;
-        continue;
-      }
-      const end = new Date(r.endAt).getTime();
-      if (Number.isNaN(end)) continue;
-      if (end >= now) upcoming++;
-      else past++;
-    }
-    return { total: list.length, upcoming, past, cancelled };
-  }, [reservationsSummaryQuery.data]);
+    const m = reservationMetricsQuery.data;
+    if (!m) return { total: 0, upcoming: 0, past: 0, cancelled: 0 };
+    return {
+      total: m.total,
+      upcoming: m.upcoming,
+      past: m.past,
+      cancelled: m.cancelled,
+    };
+  }, [reservationMetricsQuery.data]);
 
   const branchStats = useMemo(() => {
     const list = branchesQuery.data ?? [];
@@ -89,6 +81,7 @@ export function ProviderDashboardPage() {
     onSuccess: (_data, vars) => {
       queryClient.invalidateQueries({ queryKey: ['providerBranches'] });
       queryClient.invalidateQueries({ queryKey: ['providerReservations'] });
+      queryClient.invalidateQueries({ queryKey: ['providerReservationMetrics'] });
       queryClient.invalidateQueries({ queryKey: ['providerRoomsTotal'] });
       setActionBanner({ message: `Sucursal «${vars.name}» creada correctamente.` });
       setShowBranchForm(false);
@@ -101,6 +94,7 @@ export function ProviderDashboardPage() {
     onSuccess: (_data, vars) => {
       queryClient.invalidateQueries({ queryKey: ['providerBranches'] });
       queryClient.invalidateQueries({ queryKey: ['providerReservations'] });
+      queryClient.invalidateQueries({ queryKey: ['providerReservationMetrics'] });
       setActionBanner({ message: `Datos de «${vars.body.name}» actualizados.` });
       setEditingId(null);
     },
@@ -111,6 +105,7 @@ export function ProviderDashboardPage() {
     onSuccess: (_d, deletedId) => {
       queryClient.invalidateQueries({ queryKey: ['providerBranches'] });
       queryClient.invalidateQueries({ queryKey: ['providerReservations'] });
+      queryClient.invalidateQueries({ queryKey: ['providerReservationMetrics'] });
       queryClient.invalidateQueries({ queryKey: ['providerRoomsTotal'] });
       queryClient.removeQueries({ queryKey: ['providerRooms', deletedId] });
       setSelectedId((cur) => (cur === deletedId ? null : cur));
@@ -124,6 +119,7 @@ export function ProviderDashboardPage() {
     onSuccess: (_d, vars) => {
       queryClient.invalidateQueries({ queryKey: ['providerBranches'] });
       queryClient.invalidateQueries({ queryKey: ['providerReservations'] });
+      queryClient.invalidateQueries({ queryKey: ['providerReservationMetrics'] });
       setActionBanner({
         message: vars.active
           ? 'Sucursal activada: visible según reglas del catálogo.'
@@ -233,7 +229,7 @@ export function ProviderDashboardPage() {
           reservationsPast={reservationStats.past}
           reservationsCancelled={reservationStats.cancelled}
           roomsLoading={roomsCountQuery.isPending}
-          reservationsLoading={reservationsSummaryQuery.isPending}
+          reservationsLoading={reservationMetricsQuery.isPending}
         />
       )}
 

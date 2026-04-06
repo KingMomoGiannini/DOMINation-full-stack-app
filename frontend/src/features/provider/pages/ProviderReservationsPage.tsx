@@ -1,14 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getMyBranches, getProviderReservations } from '../../../api';
+import { getMyBranches, getProviderReservationsPage } from '../../../api';
 import type { Reservation } from '../../../types/booking';
 import { branchesToMap, resolveReservationBranchDisplay } from '../../../utils/branchLookup';
 import { formatReservationSchedule, getReservationStatusMeta } from '../../../utils/reservationDisplay';
 import {
   getReservationTemporalHint,
   isReservationLiveNow,
-  reservationMatchesFilters,
-  sortReservations,
   type ReservationSortMode,
   type ReservationStatusFilter,
   type ReservationTimeFilter,
@@ -23,27 +21,57 @@ import { ReservationLineItems } from '../../../components/reservations/Reservati
 import { ReservationFiltersBar } from '../../../components/reservations/ReservationFiltersBar';
 import { ProviderAreaNav } from '../../../components/provider/ProviderAreaNav';
 
-export function ProviderReservationsPage() {
-  const listQuery = useQuery({
-    queryKey: ['providerReservations'],
-    queryFn: getProviderReservations,
-  });
+function toIsoParam(localDatetime: string): string | undefined {
+  const t = localDatetime.trim();
+  if (!t) return undefined;
+  return t.length === 16 ? `${t}:00` : t;
+}
 
+export function ProviderReservationsPage() {
   const [branchFilter, setBranchFilter] = useState<number | 'ALL'>('ALL');
   const [statusFilter, setStatusFilter] = useState<ReservationStatusFilter>('ALL');
   const [timeFilter, setTimeFilter] = useState<ReservationTimeFilter>('ALL');
   const [sortMode, setSortMode] = useState<ReservationSortMode>('START_DESC');
+  const [windowFrom, setWindowFrom] = useState('');
+  const [windowTo, setWindowTo] = useState('');
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(15);
 
-  const needsBranchCatalog = useMemo(() => {
-    const list = listQuery.data ?? [];
-    return list.some((r) => !String(r.branchName ?? '').trim());
-  }, [listQuery.data]);
+  const listParams = useMemo(
+    () => ({
+      page,
+      size: pageSize,
+      branchId: branchFilter === 'ALL' ? undefined : branchFilter,
+      status: statusFilter === 'ALL' ? undefined : statusFilter,
+      time: timeFilter,
+      from: toIsoParam(windowFrom),
+      to: toIsoParam(windowTo),
+      sort: sortMode === 'START_ASC' ? 'startAt,asc' : 'startAt,desc',
+    }),
+    [page, pageSize, branchFilter, statusFilter, timeFilter, windowFrom, windowTo, sortMode]
+  );
+
+  useEffect(() => {
+    setPage(0);
+  }, [branchFilter, statusFilter, timeFilter, sortMode, windowFrom, windowTo, pageSize]);
+
+  const listQuery = useQuery({
+    queryKey: ['providerReservations', listParams],
+    queryFn: () => getProviderReservationsPage(listParams),
+    placeholderData: (p) => p,
+  });
 
   const branchesQuery = useQuery({
     queryKey: ['providerBranches'],
     queryFn: getMyBranches,
-    enabled: listQuery.isSuccess && (listQuery.data?.length ?? 0) > 0,
   });
+
+  const rows: Reservation[] = listQuery.data?.content ?? [];
+  const pg = listQuery.data;
+
+  const needsBranchCatalog = useMemo(() => {
+    return rows.some((r) => !String(r.branchName ?? '').trim());
+  }, [rows]);
 
   const branchMap = useMemo(() => branchesToMap(branchesQuery.data ?? []), [branchesQuery.data]);
 
@@ -51,19 +79,6 @@ export function ProviderReservationsPage() {
     () => (branchesQuery.data ?? []).map((b) => ({ id: b.id, name: b.name })),
     [branchesQuery.data]
   );
-
-  const rows: Reservation[] = listQuery.data ?? [];
-
-  const filteredSorted = useMemo(() => {
-    const filtered = rows.filter((r) =>
-      reservationMatchesFilters(r, {
-        branchId: branchFilter,
-        status: statusFilter,
-        time: timeFilter,
-      })
-    );
-    return sortReservations(filtered, sortMode);
-  }, [rows, branchFilter, statusFilter, timeFilter, sortMode]);
 
   const renderBranch = (r: Reservation) => {
     const catalogReady = !needsBranchCatalog || branchesQuery.isFetched;
@@ -90,12 +105,20 @@ export function ProviderReservationsPage() {
     return d;
   };
 
+  const listInitialLoading = listQuery.isPending && !listQuery.data;
+  const hasFilters =
+    branchFilter !== 'ALL' ||
+    statusFilter !== 'ALL' ||
+    timeFilter !== 'ALL' ||
+    windowFrom.trim() !== '' ||
+    windowTo.trim() !== '';
+
   return (
     <div className="main-content">
       <PageHeader
         title="Reservas en"
         highlight="tus sucursales"
-        subtitle="Filtrá por sucursal, estado o momento. La cancelación la hace el cliente desde su cuenta."
+        subtitle="Filtros y paginación en servidor. Ventana opcional: reservas que solapan con el rango indicado."
       />
 
       <ProviderAreaNav />
@@ -118,12 +141,16 @@ export function ProviderReservationsPage() {
         />
       )}
 
-      {listQuery.isPending ? (
+      {listInitialLoading ? (
         <Spinner label="Cargando reservas…" />
-      ) : rows.length === 0 ? (
+      ) : (pg?.totalElements ?? 0) === 0 ? (
         <EmptyState
-          title="No hay reservas en tus sucursales"
-          description="Cuando un cliente reserve una franja en una sucursal tuya, el registro aparecerá acá."
+          title="No hay reservas que coincidan"
+          description={
+            hasFilters
+              ? 'Probá ampliar filtros, ventana temporal o volvé a «Todas».'
+              : 'Cuando un cliente reserve una franja en una sucursal tuya, el registro aparecerá acá.'
+          }
         />
       ) : (
         <>
@@ -139,23 +166,67 @@ export function ProviderReservationsPage() {
             onStatus={setStatusFilter}
             onTime={setTimeFilter}
             onSort={setSortMode}
+            showWindowFilter
+            windowFrom={windowFrom}
+            windowTo={windowTo}
+            onWindowFrom={setWindowFrom}
+            onWindowTo={setWindowTo}
           />
+          <div className="reservation-filters" style={{ marginTop: '-0.5rem', marginBottom: '1rem' }}>
+            <div className="reservation-filters__field">
+              <label htmlFor="prov-page-size">Por página</label>
+              <select
+                id="prov-page-size"
+                value={String(pageSize)}
+                onChange={(e) => setPageSize(Number(e.target.value))}
+                className="admin-pr-input"
+                style={{ minWidth: '100px' }}
+              >
+                <option value="10">10</option>
+                <option value="15">15</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+              </select>
+            </div>
+          </div>
           <p className="reservation-filters__meta">
-            Mostrando <strong>{filteredSorted.length}</strong> de {rows.length} reservas
-            {branchFilter !== 'ALL' || statusFilter !== 'ALL' || timeFilter !== 'ALL'
-              ? ' (filtros activos)'
-              : null}
-            .
+            Página <strong>{(pg?.number ?? 0) + 1}</strong> de <strong>{Math.max(pg?.totalPages ?? 1, 1)}</strong> ·{' '}
+            <strong>{pg?.numberOfElements ?? rows.length}</strong> en esta página ·{' '}
+            <strong>{pg?.totalElements ?? 0}</strong> totales con filtros actuales
+            {listQuery.isFetching && !listInitialLoading ? ' · Actualizando…' : null}.
           </p>
 
-          {filteredSorted.length === 0 ? (
+          <nav className="pagination-bar" aria-label="Páginas de reservas">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={pg?.first !== false}
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+            >
+              Anterior
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={pg?.last !== false}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Siguiente
+            </button>
+          </nav>
+
+          {rows.length === 0 ? (
             <EmptyState
-              title="Nada coincide con los filtros"
-              description="Probá ampliar sucursal, estado o momento, o restablecé «Todos» en cada lista."
-            />
+              title="Página vacía"
+              description="No hay filas en esta página. Probá otra página o tamaño."
+            >
+              <button type="button" className="btn btn-primary" onClick={() => setPage(0)}>
+                Primera página
+              </button>
+            </EmptyState>
           ) : (
             <div className="reservation-list">
-              {filteredSorted.map((r) => {
+              {rows.map((r) => {
                 const schedule = formatReservationSchedule(r.startAt, r.endAt);
                 const statusMeta = getReservationStatusMeta(r.status);
                 const branch = renderBranch(r);

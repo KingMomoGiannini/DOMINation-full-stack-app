@@ -3,6 +3,7 @@ import type {
   CreateReservationRequest,
   Reservation,
 } from '../types/booking';
+import type { PageResponse } from '../types/page';
 import { http } from './http';
 
 export type {
@@ -35,7 +36,43 @@ export const cancelReservation = async (id: number): Promise<Reservation> => {
   return data;
 };
 
-export const getProviderReservations = async (): Promise<Reservation[]> => {
-  const { data } = await http.get<Reservation[]>('/api/booking/provider/reservations');
+export interface ProviderReservationsQuery {
+  page?: number;
+  size?: number;
+  branchId?: number;
+  status?: 'PENDING' | 'CONFIRMED' | 'CANCELLED';
+  time?: 'ALL' | 'UPCOMING' | 'PAST';
+  from?: string;
+  to?: string;
+  sort?: string;
+}
+
+export interface ProviderReservationMetrics {
+  total: number;
+  cancelled: number;
+  upcoming: number;
+  past: number;
+}
+
+export const getProviderReservationsPage = async (
+  q: ProviderReservationsQuery
+): Promise<PageResponse<Reservation>> => {
+  const params = new URLSearchParams();
+  params.set('page', String(q.page ?? 0));
+  params.set('size', String(q.size ?? 15));
+  params.set('time', q.time ?? 'ALL');
+  params.set('sort', q.sort ?? 'startAt,desc');
+  if (q.branchId != null) params.set('branchId', String(q.branchId));
+  if (q.status != null) params.set('status', q.status);
+  if (q.from) params.set('from', q.from);
+  if (q.to) params.set('to', q.to);
+  const { data } = await http.get<PageResponse<Reservation>>(
+    `/api/booking/provider/reservations?${params.toString()}`
+  );
+  return data;
+};
+
+export const getProviderReservationMetrics = async (): Promise<ProviderReservationMetrics> => {
+  const { data } = await http.get<ProviderReservationMetrics>('/api/booking/provider/reservations/metrics');
   return data;
 };
