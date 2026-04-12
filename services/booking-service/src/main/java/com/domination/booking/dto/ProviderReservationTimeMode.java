@@ -1,10 +1,11 @@
 package com.domination.booking.dto;
 
 /**
- * Filtro temporal alineado con el listado del prestador (franja activa vs pasada).
+ * Filtro operativo derivado para el listado del prestador.
  */
 public enum ProviderReservationTimeMode {
     ALL,
     UPCOMING,
-    PAST
+    IN_PROGRESS,
+    COMPLETED
 }

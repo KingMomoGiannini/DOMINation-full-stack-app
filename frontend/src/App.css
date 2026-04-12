@@ -730,6 +730,24 @@ body {
   border-color: rgba(255, 136, 0, 0.6);
 }
 
+.reservation-status-badge--upcoming {
+  background: rgba(255, 255, 255, 0.12);
+  color: #f5f5f5;
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.reservation-status-badge--in-progress {
+  background: rgba(0, 140, 255, 0.25);
+  color: #9ee7ff;
+  border-color: rgba(0, 170, 255, 0.55);
+}
+
+.reservation-status-badge--completed {
+  background: rgba(120, 120, 120, 0.2);
+  color: #d6d6d6;
+  border-color: rgba(190, 190, 190, 0.3);
+}
+
 .reservation-status-badge--confirmed {
   background: rgba(0, 160, 0, 0.28);
   color: #b9f6b0;
@@ -949,6 +967,21 @@ body {
   color: #9ee7ff;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+.reservation-card__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-bottom: 0.35rem;
+}
+
+.reservation-card__policy {
+  font-family: 'Arial', sans-serif;
+  font-size: 0.85rem;
+  color: var(--gray-light);
+  margin-top: 0.55rem;
+  line-height: 1.45;
 }
 
 .reservation-card__main-col {

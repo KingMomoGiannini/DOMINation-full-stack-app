@@ -11,6 +11,9 @@ import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -42,6 +45,9 @@ class FlywayBookingSchemaIT {
             assertTableExists(md, "reservation_lines");
             assertColumnExists(md, "reservations", "branch_name");
             assertColumnExists(md, "reservation_lines", "item_name");
+            assertIndexExists(md, "reservations", "idx_reservations_customer_start_id");
+            assertIndexExists(md, "reservations", "idx_reservations_provider_start_id");
+            assertIndexExists(md, "reservations", "idx_reservations_provider_branch_start_id");
         }
     }
 
@@ -55,5 +61,18 @@ class FlywayBookingSchemaIT {
         try (ResultSet rs = md.getColumns(null, "public", table, column)) {
             assertTrue(rs.next(), "columna faltante: " + table + "." + column);
         }
+    }
+
+    private static void assertIndexExists(DatabaseMetaData md, String table, String indexName) throws SQLException {
+        Set<String> indexNames = new HashSet<>();
+        try (ResultSet rs = md.getIndexInfo(null, "public", table, false, false)) {
+            while (rs.next()) {
+                String current = rs.getString("INDEX_NAME");
+                if (current != null) {
+                    indexNames.add(current.toLowerCase(Locale.ROOT));
+                }
+            }
+        }
+        assertTrue(indexNames.contains(indexName.toLowerCase(Locale.ROOT)), "índice faltante: " + indexName);
     }
 }

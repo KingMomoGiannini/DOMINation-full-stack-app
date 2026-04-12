@@ -5,9 +5,17 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "provider_requests", uniqueConstraints = {
-    @UniqueConstraint(columnNames = {"user_id", "status"})
-})
+@Table(
+    name = "provider_requests",
+    uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"user_id", "status"})
+    },
+    indexes = {
+        @Index(name = "idx_provider_requests_created_at_id", columnList = "created_at,id"),
+        @Index(name = "idx_provider_requests_user_id_created_at_id", columnList = "user_id,created_at,id"),
+        @Index(name = "idx_provider_requests_status_created_at_id", columnList = "status,created_at,id")
+    }
+)
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class ProviderRequest {
 

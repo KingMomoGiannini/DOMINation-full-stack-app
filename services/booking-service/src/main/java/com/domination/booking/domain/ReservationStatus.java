@@ -1,12 +1,11 @@
 package com.domination.booking.domain;
 
 /**
- * Estados de una reserva
+ * Estados persistidos de una reserva.
+ * El momento operativo (proxima / en curso / finalizada) se deriva aparte.
  */
 public enum ReservationStatus {
-    PENDING,      // Pendiente de confirmación
-    CONFIRMED,    // Confirmada
-    CANCELLED     // Cancelada
+    PENDING,
+    CONFIRMED,
+    CANCELLED
 }
-
-

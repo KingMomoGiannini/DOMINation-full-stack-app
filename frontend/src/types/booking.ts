@@ -19,6 +19,9 @@ export interface Reservation {
   startAt: string;
   endAt: string;
   status: 'PENDING' | 'CONFIRMED' | 'CANCELLED';
+  operationalStatus: 'UPCOMING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  cancellable: boolean;
+  cancellationBlockReason?: 'ALREADY_CANCELLED' | 'ALREADY_STARTED' | null;
   createdAt: string;
   lines: ReservationLine[];
 }

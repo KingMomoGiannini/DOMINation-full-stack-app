@@ -28,6 +28,19 @@ public class ReservationDTO {
     private LocalDateTime startAt;
     private LocalDateTime endAt;
     private ReservationStatus status;
+    /**
+     * Vista operativa derivada a partir de status + tiempo actual.
+     * Se usa para UX y filtros sin mezclar semántica persistida con cálculo en cliente.
+     */
+    private ReservationOperationalStatus operationalStatus;
+    /**
+     * Flag derivado con la regla vigente de cancelación.
+     */
+    private boolean cancellable;
+    /**
+     * Motivo derivado cuando la reserva ya no puede cancelarse.
+     */
+    private ReservationCancellationBlockReason cancellationBlockReason;
     private LocalDateTime createdAt;
     
     @Builder.Default

@@ -55,11 +55,12 @@ export function ProviderDashboardPage() {
 
   const reservationStats = useMemo(() => {
     const m = reservationMetricsQuery.data;
-    if (!m) return { total: 0, upcoming: 0, past: 0, cancelled: 0 };
+    if (!m) return { total: 0, upcoming: 0, inProgress: 0, completed: 0, cancelled: 0 };
     return {
       total: m.total,
       upcoming: m.upcoming,
-      past: m.past,
+      inProgress: m.inProgress,
+      completed: m.completed,
       cancelled: m.cancelled,
     };
   }, [reservationMetricsQuery.data]);
@@ -226,7 +227,8 @@ export function ProviderDashboardPage() {
           roomsTotal={roomsCountQuery.data ?? 0}
           reservationsTotal={reservationStats.total}
           reservationsUpcoming={reservationStats.upcoming}
-          reservationsPast={reservationStats.past}
+          reservationsInProgress={reservationStats.inProgress}
+          reservationsCompleted={reservationStats.completed}
           reservationsCancelled={reservationStats.cancelled}
           roomsLoading={roomsCountQuery.isPending}
           reservationsLoading={reservationMetricsQuery.isPending}

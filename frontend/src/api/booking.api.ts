@@ -41,7 +41,7 @@ export interface ProviderReservationsQuery {
   size?: number;
   branchId?: number;
   status?: 'PENDING' | 'CONFIRMED' | 'CANCELLED';
-  time?: 'ALL' | 'UPCOMING' | 'PAST';
+  time?: 'ALL' | 'UPCOMING' | 'IN_PROGRESS' | 'COMPLETED';
   from?: string;
   to?: string;
   sort?: string;
@@ -51,7 +51,8 @@ export interface ProviderReservationMetrics {
   total: number;
   cancelled: number;
   upcoming: number;
-  past: number;
+  inProgress: number;
+  completed: number;
 }
 
 export const getProviderReservationsPage = async (

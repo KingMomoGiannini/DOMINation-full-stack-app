@@ -17,7 +17,6 @@ interface ReservationFiltersBarProps {
   onSort: (v: ReservationSortMode) => void;
   showBranchFilter: boolean;
   idPrefix: string;
-  /** Ventana opcional (solape con franjas de reserva) — solo si el backend acepta from/to. */
   showWindowFilter?: boolean;
   windowFrom?: string;
   windowTo?: string;
@@ -66,7 +65,7 @@ export function ReservationFiltersBar({
         </div>
       )}
       <div className="reservation-filters__field">
-        <label htmlFor={`${idPrefix}-status`}>Estado</label>
+        <label htmlFor={`${idPrefix}-status`}>Registro</label>
         <select
           id={`${idPrefix}-status`}
           value={status}
@@ -79,15 +78,16 @@ export function ReservationFiltersBar({
         </select>
       </div>
       <div className="reservation-filters__field">
-        <label htmlFor={`${idPrefix}-time`}>Momento</label>
+        <label htmlFor={`${idPrefix}-time`}>Estado operativo</label>
         <select
           id={`${idPrefix}-time`}
           value={time}
           onChange={(e) => onTime(e.target.value as ReservationTimeFilter)}
         >
           <option value="ALL">Todas</option>
-          <option value="UPCOMING">Próximas / vigentes</option>
-          <option value="PAST">Pasadas</option>
+          <option value="UPCOMING">Próximas</option>
+          <option value="IN_PROGRESS">En curso</option>
+          <option value="COMPLETED">Finalizadas</option>
         </select>
       </div>
       <div className="reservation-filters__field">

@@ -5,15 +5,13 @@ export interface ProviderStatsSummaryProps {
   roomsTotal: number;
   reservationsTotal: number;
   reservationsUpcoming: number;
-  reservationsPast: number;
+  reservationsInProgress: number;
+  reservationsCompleted: number;
   reservationsCancelled: number;
   roomsLoading: boolean;
   reservationsLoading: boolean;
 }
 
-/**
- * Resumen operativo con datos reales de catálogo + listado de reservas del prestador.
- */
 export function ProviderStatsSummary({
   branchesTotal,
   branchesActive,
@@ -21,7 +19,8 @@ export function ProviderStatsSummary({
   roomsTotal,
   reservationsTotal,
   reservationsUpcoming,
-  reservationsPast,
+  reservationsInProgress,
+  reservationsCompleted,
   reservationsCancelled,
   roomsLoading,
   reservationsLoading,
@@ -41,7 +40,7 @@ export function ProviderStatsSummary({
           <span className="provider-stat-card__label">Salas (ROOM)</span>
           {roomsLoading ? (
             <span className="provider-stat-card__loading" aria-busy="true">
-              Calculando…
+              Calculando...
             </span>
           ) : (
             <>
@@ -54,14 +53,14 @@ export function ProviderStatsSummary({
           <span className="provider-stat-card__label">Reservas</span>
           {reservationsLoading ? (
             <span className="provider-stat-card__loading" aria-busy="true">
-              Cargando…
+              Cargando...
             </span>
           ) : (
             <>
               <span className="provider-stat-card__value">{reservationsTotal}</span>
               <span className="provider-stat-card__hint">
-                {reservationsUpcoming} próximas/vigentes · {reservationsPast} pasadas · {reservationsCancelled}{' '}
-                canceladas (conteos en servidor)
+                {reservationsUpcoming} próximas · {reservationsInProgress} en curso · {reservationsCompleted}{' '}
+                finalizadas · {reservationsCancelled} canceladas
               </span>
             </>
           )}

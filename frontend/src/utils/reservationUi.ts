@@ -1,8 +1,23 @@
 import type { Reservation } from '../types/booking';
 
 export type ReservationStatusFilter = 'ALL' | 'PENDING' | 'CONFIRMED' | 'CANCELLED';
-export type ReservationTimeFilter = 'ALL' | 'UPCOMING' | 'PAST';
+export type ReservationTimeFilter = 'ALL' | 'UPCOMING' | 'IN_PROGRESS' | 'COMPLETED';
 export type ReservationSortMode = 'START_DESC' | 'START_ASC';
+
+function deriveOperationalStatusFallback(r: Reservation, nowMs: number): Reservation['operationalStatus'] {
+  if (r.status === 'CANCELLED') return 'CANCELLED';
+  const start = new Date(r.startAt).getTime();
+  const end = new Date(r.endAt).getTime();
+  if (Number.isNaN(start) || Number.isNaN(end)) return 'UPCOMING';
+  if (nowMs < start) return 'UPCOMING';
+  if (nowMs < end) return 'IN_PROGRESS';
+  return 'COMPLETED';
+}
+
+export function getOperationalStatus(r: Reservation, nowMs?: number): Reservation['operationalStatus'] {
+  if (r.operationalStatus) return r.operationalStatus;
+  return deriveOperationalStatusFallback(r, nowMs ?? Date.now());
+}
 
 export function reservationMatchesFilters(
   r: Reservation,
@@ -13,19 +28,9 @@ export function reservationMatchesFilters(
     nowMs?: number;
   }
 ): boolean {
-  const now = opts.nowMs ?? Date.now();
   if (opts.branchId !== 'ALL' && r.branchId !== opts.branchId) return false;
   if (opts.status !== 'ALL' && r.status !== opts.status) return false;
-  if (opts.time !== 'ALL') {
-    const end = new Date(r.endAt).getTime();
-    if (opts.time === 'UPCOMING') {
-      if (r.status === 'CANCELLED') return false;
-      return end >= now;
-    }
-    if (opts.time === 'PAST') {
-      return end < now;
-    }
-  }
+  if (opts.time !== 'ALL' && getOperationalStatus(r, opts.nowMs) !== opts.time) return false;
   return true;
 }
 
@@ -39,21 +44,24 @@ export function sortReservations(list: Reservation[], mode: ReservationSortMode)
   return copy;
 }
 
-/** Pista operativa para escanear rápido (solo fechas del cliente). */
-export function getReservationTemporalHint(startAt: string, endAt: string, nowMs?: number): string {
+export function getReservationTemporalHint(r: Reservation, nowMs?: number): string {
+  const operationalStatus = getOperationalStatus(r, nowMs);
+  if (operationalStatus === 'CANCELLED') {
+    return 'Reserva cancelada';
+  }
+
   const now = nowMs ?? Date.now();
-  const start = new Date(startAt).getTime();
-  const end = new Date(endAt).getTime();
+  const start = new Date(r.startAt).getTime();
+  const end = new Date(r.endAt).getTime();
   if (Number.isNaN(start) || Number.isNaN(end)) return '';
 
-  if (now >= start && now <= end) return 'En curso ahora';
+  if (operationalStatus === 'IN_PROGRESS') return 'En curso ahora';
+  if (operationalStatus === 'COMPLETED') return 'Franja finalizada';
 
   const dayStart = new Date(now);
   dayStart.setHours(0, 0, 0, 0);
   const dayEnd = new Date(dayStart);
   dayEnd.setDate(dayEnd.getDate() + 1);
-
-  if (end < now) return 'Franja pasada';
 
   if (start >= dayStart.getTime() && start < dayEnd.getTime()) return 'Hoy';
 
@@ -66,15 +74,22 @@ export function getReservationTemporalHint(startAt: string, endAt: string, nowMs
   const diffDays = Math.ceil((start - dayStart.getTime()) / (86400 * 1000));
   if (diffDays === 2) return 'Pasado mañana';
   if (diffDays > 2 && diffDays <= 14) return `En ${diffDays} días`;
-  if (diffDays > 14) return 'Próxima';
   return 'Próxima';
 }
 
 export function isReservationLiveNow(r: Reservation, nowMs?: number): boolean {
-  if (r.status === 'CANCELLED') return false;
-  const now = nowMs ?? Date.now();
-  const start = new Date(r.startAt).getTime();
-  const end = new Date(r.endAt).getTime();
-  if (Number.isNaN(start) || Number.isNaN(end)) return false;
-  return now >= start && now <= end;
+  return getOperationalStatus(r, nowMs) === 'IN_PROGRESS';
+}
+
+export function getCancellationMessage(r: Reservation): string {
+  if (r.cancellable) {
+    return 'Se puede cancelar antes del inicio de la franja.';
+  }
+  if (r.cancellationBlockReason === 'ALREADY_CANCELLED') {
+    return 'Ya fue cancelada.';
+  }
+  if (r.cancellationBlockReason === 'ALREADY_STARTED') {
+    return 'Solo puede cancelarse antes del inicio.';
+  }
+  return 'La cancelación depende de la regla vigente del backend.';
 }

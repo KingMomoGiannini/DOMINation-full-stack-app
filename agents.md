@@ -268,3 +268,81 @@ Cuando proponga comandos, priorizar:
 ```bash
 cd infra
 docker-compose up -d
+```
+
+### Buenas prácticas de programación y principios SOLID
+
+### Principios generales
+Todo cambio debe priorizar:
+- legibilidad
+- mantenibilidad
+- bajo acoplamiento
+- cohesión alta
+- nombres claros y consistentes
+- responsabilidad bien delimitada
+- simplicidad antes que sobreingeniería
+
+### SOLID
+Respetar principios SOLID siempre que apliquen de forma razonable.
+
+#### S — Single Responsibility Principle
+- Cada clase, componente o módulo debe tener una única responsabilidad principal.
+- Evitar clases “Dios” que concentren lógica de negocio, persistencia, validación y transformación al mismo tiempo.
+- Controllers, services, repositories, mappers y configs deben conservar responsabilidades separadas.
+
+#### O — Open/Closed Principle
+- El código debe poder extenderse sin modificar innecesariamente lógica estable.
+- Preferir extensibilidad mediante composición, interfaces o estrategias cuando el caso lo justifique.
+- No introducir abstracciones artificiales si el problema aún no lo requiere.
+
+#### L — Liskov Substitution Principle
+- Las implementaciones deben respetar el contrato de sus abstracciones.
+- No romper expectativas semánticas al heredar o implementar interfaces.
+- Evitar sobrescrituras que cambien comportamientos esenciales de forma sorpresiva.
+
+#### I — Interface Segregation Principle
+- Preferir interfaces pequeñas y específicas antes que contratos gigantes.
+- No obligar a una clase a depender de métodos que no necesita.
+- Evitar interfaces “multiuso” sin foco claro.
+
+#### D — Dependency Inversion Principle
+- Depender de abstracciones cuando tenga sentido, no de detalles concretos acoplados.
+- Favorecer inyección de dependencias.
+- Evitar crear dependencias rígidas entre capas o servicios.
+
+### Buenas prácticas obligatorias
+- Escribir código claro antes que “ingenioso”.
+- Evitar duplicación innecesaria.
+- Evitar métodos excesivamente largos.
+- Evitar anidaciones profundas si puede expresarse de forma más simple.
+- Usar nombres que expliquen intención.
+- Mantener validaciones cerca del punto correcto de responsabilidad.
+- Manejar errores de forma explícita y consistente.
+- No usar comentarios para tapar código confuso; primero mejorar el código.
+- No introducir complejidad accidental.
+- No abusar de patrones de diseño si el problema no los necesita.
+
+### Backend
+- Mantener separación clara entre controller, service, repository, dto, mapper y config.
+- No mover lógica de negocio al controller.
+- No acoplar servicios a detalles de infraestructura innecesariamente.
+- Preferir servicios pequeños, cohesivos y testeables.
+- Validar inputs de forma consistente.
+- Preservar contratos HTTP claros y estables.
+
+### Frontend
+- Crear componentes con responsabilidad clara.
+- Evitar componentes gigantes con lógica, render y acceso a datos mezclados.
+- Reutilizar lógica compartida cuando tenga sentido.
+- Mantener tipado fuerte en TypeScript.
+- Evitar `any` salvo justificación clara.
+- Mantener consistencia de UI y comportamiento.
+
+### Tests y mantenibilidad
+- El diseño debe facilitar testeo.
+- Evitar código difícil de aislar o mockear por acoplamiento innecesario.
+- Toda lógica nueva relevante debería poder probarse de forma razonable.
+
+### Regla de criterio
+Aplicar buenas prácticas y SOLID con criterio técnico.
+No forzar patrones, interfaces o capas extra si solo agregan complejidad sin valor real.

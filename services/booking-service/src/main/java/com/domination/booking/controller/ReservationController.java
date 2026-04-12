@@ -66,6 +66,7 @@ public class ReservationController {
             @RequestParam(defaultValue = "15") int size,
             @RequestParam(defaultValue = "startAt,desc") String sort) {
         Long providerId = extractUserId(jwt);
+        validateWindow(from, to);
         int safeSize = Math.min(Math.max(size, 1), 100);
         Pageable pageable = PageRequest.of(Math.max(page, 0), safeSize, parseStartAtSort(sort));
         Page<ReservationDTO> result = reservationService.searchProviderReservations(
@@ -117,18 +118,22 @@ public class ReservationController {
      */
     private static Sort parseStartAtSort(String sort) {
         if (sort == null || sort.isBlank()) {
-            return Sort.by(Sort.Direction.DESC, "startAt");
+            return startAtSort(Sort.Direction.DESC);
         }
         String[] parts = sort.split(",", 2);
         String prop = parts[0].trim();
         if (!"startAt".equalsIgnoreCase(prop)) {
-            return Sort.by(Sort.Direction.DESC, "startAt");
+            return startAtSort(Sort.Direction.DESC);
         }
         Sort.Direction dir = Sort.Direction.DESC;
         if (parts.length > 1 && "asc".equalsIgnoreCase(parts[1].trim())) {
             dir = Sort.Direction.ASC;
         }
-        return Sort.by(dir, "startAt");
+        return startAtSort(dir);
+    }
+
+    private static Sort startAtSort(Sort.Direction dir) {
+        return Sort.by(dir, "startAt").and(Sort.by(dir, "id"));
     }
 
     private static ProviderReservationTimeMode parseTimeMode(String raw) {
@@ -137,7 +142,8 @@ public class ReservationController {
         }
         return switch (raw.trim().toUpperCase()) {
             case "UPCOMING" -> ProviderReservationTimeMode.UPCOMING;
-            case "PAST" -> ProviderReservationTimeMode.PAST;
+            case "IN_PROGRESS" -> ProviderReservationTimeMode.IN_PROGRESS;
+            case "COMPLETED", "PAST" -> ProviderReservationTimeMode.COMPLETED;
             default -> ProviderReservationTimeMode.ALL;
         };
     }
@@ -154,6 +160,12 @@ public class ReservationController {
             return Long.parseLong((String) userIdClaim);
         }
         throw new IllegalStateException("userId tiene un tipo no soportado: " + userIdClaim.getClass());
+    }
+
+    private static void validateWindow(LocalDateTime from, LocalDateTime to) {
+        if (from != null && to != null && from.isAfter(to)) {
+            throw new IllegalArgumentException("El parámetro 'from' no puede ser posterior a 'to'");
+        }
     }
 
     /**

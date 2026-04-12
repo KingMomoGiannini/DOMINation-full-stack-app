@@ -3,8 +3,13 @@ import { useQuery } from '@tanstack/react-query';
 import { getMyBranches, getProviderReservationsPage } from '../../../api';
 import type { Reservation } from '../../../types/booking';
 import { branchesToMap, resolveReservationBranchDisplay } from '../../../utils/branchLookup';
-import { formatReservationSchedule, getReservationStatusMeta } from '../../../utils/reservationDisplay';
 import {
+  formatReservationSchedule,
+  getReservationOperationalMeta,
+  getReservationRecordMeta,
+} from '../../../utils/reservationDisplay';
+import {
+  getCancellationMessage,
   getReservationTemporalHint,
   isReservationLiveNow,
   type ReservationSortMode,
@@ -69,9 +74,7 @@ export function ProviderReservationsPage() {
   const rows: Reservation[] = listQuery.data?.content ?? [];
   const pg = listQuery.data;
 
-  const needsBranchCatalog = useMemo(() => {
-    return rows.some((r) => !String(r.branchName ?? '').trim());
-  }, [rows]);
+  const needsBranchCatalog = useMemo(() => rows.some((r) => !String(r.branchName ?? '').trim()), [rows]);
 
   const branchMap = useMemo(() => branchesToMap(branchesQuery.data ?? []), [branchesQuery.data]);
 
@@ -87,7 +90,7 @@ export function ProviderReservationsPage() {
       r.branchName,
       branchMap,
       catalogReady,
-      'Cargando tus sucursales para mostrar el nombre…'
+      'Cargando tus sucursales para mostrar el nombre...'
     );
     if (d.resolved) return d;
     if (catalogReady && needsBranchCatalog) {
@@ -95,7 +98,7 @@ export function ProviderReservationsPage() {
         primary: d.primary,
         secondary: [
           d.secondary,
-          'Si la sucursal ya no está en tu panel, puede ser datos históricos: el contrato solo garantiza branchId.',
+          'Si la sucursal ya no está en tu panel, puede tratarse de datos históricos: el contrato solo garantiza branchId.',
         ]
           .filter(Boolean)
           .join(' '),
@@ -118,7 +121,7 @@ export function ProviderReservationsPage() {
       <PageHeader
         title="Reservas en"
         highlight="tus sucursales"
-        subtitle="Filtros y paginación en servidor. Ventana opcional: reservas que solapan con el rango indicado."
+        subtitle="Paginación y filtros server-side con semántica operativa clara: próximas, en curso, finalizadas y canceladas."
       />
 
       <ProviderAreaNav />
@@ -142,13 +145,13 @@ export function ProviderReservationsPage() {
       )}
 
       {listInitialLoading ? (
-        <Spinner label="Cargando reservas…" />
+        <Spinner label="Cargando reservas..." />
       ) : (pg?.totalElements ?? 0) === 0 ? (
         <EmptyState
           title="No hay reservas que coincidan"
           description={
             hasFilters
-              ? 'Probá ampliar filtros, ventana temporal o volvé a «Todas».'
+              ? 'Probá ampliar filtros, cambiar el estado operativo o volver a "Todas".'
               : 'Cuando un cliente reserve una franja en una sucursal tuya, el registro aparecerá acá.'
           }
         />
@@ -193,7 +196,7 @@ export function ProviderReservationsPage() {
             Página <strong>{(pg?.number ?? 0) + 1}</strong> de <strong>{Math.max(pg?.totalPages ?? 1, 1)}</strong> ·{' '}
             <strong>{pg?.numberOfElements ?? rows.length}</strong> en esta página ·{' '}
             <strong>{pg?.totalElements ?? 0}</strong> totales con filtros actuales
-            {listQuery.isFetching && !listInitialLoading ? ' · Actualizando…' : null}.
+            {listQuery.isFetching && !listInitialLoading ? ' · Actualizando...' : null}.
           </p>
 
           <nav className="pagination-bar" aria-label="Páginas de reservas">
@@ -218,7 +221,7 @@ export function ProviderReservationsPage() {
           {rows.length === 0 ? (
             <EmptyState
               title="Página vacía"
-              description="No hay filas en esta página. Probá otra página o tamaño."
+              description="No hay filas en esta página. Probá otra página o un tamaño distinto."
             >
               <button type="button" className="btn btn-primary" onClick={() => setPage(0)}>
                 Primera página
@@ -228,9 +231,10 @@ export function ProviderReservationsPage() {
             <div className="reservation-list">
               {rows.map((r) => {
                 const schedule = formatReservationSchedule(r.startAt, r.endAt);
-                const statusMeta = getReservationStatusMeta(r.status);
+                const operationalMeta = getReservationOperationalMeta(r.operationalStatus);
+                const recordMeta = getReservationRecordMeta(r.status);
                 const branch = renderBranch(r);
-                const temporal = getReservationTemporalHint(r.startAt, r.endAt);
+                const temporal = getReservationTemporalHint(r);
                 const live = isReservationLiveNow(r);
                 return (
                   <article
@@ -239,7 +243,10 @@ export function ProviderReservationsPage() {
                   >
                     <div className="reservation-card__top">
                       <div className="reservation-card__main-col">
-                        <ReservationStatusBadge meta={statusMeta} />
+                        <div className="reservation-card__badges">
+                          <ReservationStatusBadge meta={operationalMeta} />
+                          <ReservationStatusBadge meta={recordMeta} />
+                        </div>
                         <ReservationScheduleBlock schedule={schedule} />
                         {temporal ? (
                           <span className="reservation-card__temporal">{temporal}</span>
@@ -249,6 +256,7 @@ export function ProviderReservationsPage() {
                           {branch.secondary ? <small>{branch.secondary}</small> : null}
                         </div>
                         <p className="reservation-card__ref">Referencia #{r.id}</p>
+                        <p className="reservation-card__policy">{getCancellationMessage(r)}</p>
                         <div className="provider-customer-ref">
                           {r.customerUsername?.trim() ? (
                             <>

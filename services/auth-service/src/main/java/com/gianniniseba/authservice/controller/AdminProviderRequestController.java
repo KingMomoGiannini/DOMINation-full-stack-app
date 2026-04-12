@@ -48,18 +48,22 @@ public class AdminProviderRequestController {
 
     private static Sort parseCreatedAtSort(String sort) {
         if (sort == null || sort.isBlank()) {
-            return Sort.by(Sort.Direction.DESC, "createdAt");
+            return createdAtSort(Sort.Direction.DESC);
         }
         String[] parts = sort.split(",", 2);
         String prop = parts[0].trim();
         if (!"createdAt".equalsIgnoreCase(prop)) {
-            return Sort.by(Sort.Direction.DESC, "createdAt");
+            return createdAtSort(Sort.Direction.DESC);
         }
         Sort.Direction dir = Sort.Direction.DESC;
         if (parts.length > 1 && "asc".equalsIgnoreCase(parts[1].trim())) {
             dir = Sort.Direction.ASC;
         }
-        return Sort.by(dir, "createdAt");
+        return createdAtSort(dir);
+    }
+
+    private static Sort createdAtSort(Sort.Direction dir) {
+        return Sort.by(dir, "createdAt").and(Sort.by(dir, "id"));
     }
 
     @PostMapping("/{id}/approve")

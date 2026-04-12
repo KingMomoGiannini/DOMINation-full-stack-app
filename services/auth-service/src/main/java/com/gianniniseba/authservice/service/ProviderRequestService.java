@@ -53,7 +53,7 @@ public class ProviderRequestService {
 
     @Transactional(readOnly = true)
     public ProviderRequest getMyRequest(Long userId) {
-        return providerRequestRepository.findFirstByUserIdOrderByCreatedAtDesc(userId)
+        return providerRequestRepository.findFirstByUserIdOrderByCreatedAtDescIdDesc(userId)
                 .orElse(null);
     }
 
@@ -80,11 +80,7 @@ public class ProviderRequestService {
 
     @Transactional(readOnly = true)
     public ProviderRequestSummaryDto getAdminSummary() {
-        long total = providerRequestRepository.count();
-        long pending = providerRequestRepository.countByStatus(ProviderRequest.RequestStatus.PENDING);
-        long approved = providerRequestRepository.countByStatus(ProviderRequest.RequestStatus.APPROVED);
-        long rejected = providerRequestRepository.countByStatus(ProviderRequest.RequestStatus.REJECTED);
-        return new ProviderRequestSummaryDto(total, pending, approved, rejected);
+        return providerRequestRepository.fetchAdminSummary();
     }
 
     @Transactional

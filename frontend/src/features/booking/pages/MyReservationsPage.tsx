@@ -4,8 +4,13 @@ import { Link } from 'react-router-dom';
 import { cancelReservation, getBranches, getMyReservations } from '../../../api';
 import type { Reservation } from '../../../types/booking';
 import { branchesToMap, resolveReservationBranchDisplay } from '../../../utils/branchLookup';
-import { formatReservationSchedule, getReservationStatusMeta } from '../../../utils/reservationDisplay';
 import {
+  formatReservationSchedule,
+  getReservationOperationalMeta,
+  getReservationRecordMeta,
+} from '../../../utils/reservationDisplay';
+import {
+  getCancellationMessage,
   getReservationTemporalHint,
   isReservationLiveNow,
   reservationMatchesFilters,
@@ -83,8 +88,6 @@ export function MyReservationsPage() {
     cancelMutation.error &&
     getApiErrorMessage(cancelMutation.error, 'No pudimos cancelar la reserva.');
 
-  const canCancel = (r: Reservation) => r.status !== 'CANCELLED';
-
   const renderBranch = (r: Reservation) =>
     resolveReservationBranchDisplay(
       r.branchId,
@@ -101,7 +104,7 @@ export function MyReservationsPage() {
       <PageHeader
         title="Mis"
         highlight="reservas"
-        subtitle="Franjas confirmadas y pendientes. Fechas en tu zona horaria local."
+        subtitle="Ciclo operativo claro: próximas, en curso, finalizadas o canceladas. Fechas en tu zona horaria local."
       />
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
@@ -186,18 +189,22 @@ export function MyReservationsPage() {
             <div className="reservation-list">
               {filteredSorted.map((r) => {
                 const schedule = formatReservationSchedule(r.startAt, r.endAt);
-                const statusMeta = getReservationStatusMeta(r.status);
+                const operationalMeta = getReservationOperationalMeta(r.operationalStatus);
+                const recordMeta = getReservationRecordMeta(r.status);
                 const branch = renderBranch(r);
-                const temporal = getReservationTemporalHint(r.startAt, r.endAt);
+                const temporal = getReservationTemporalHint(r);
                 const live = isReservationLiveNow(r);
                 return (
                   <article
                     key={r.id}
-                    className={`reservation-card${live ? ' reservation-card--live' : ''}`}
+                      className={`reservation-card${live ? ' reservation-card--live' : ''}`}
                   >
                     <div className="reservation-card__top">
                       <div className="reservation-card__main-col">
-                        <ReservationStatusBadge meta={statusMeta} />
+                        <div className="reservation-card__badges">
+                          <ReservationStatusBadge meta={operationalMeta} />
+                          <ReservationStatusBadge meta={recordMeta} />
+                        </div>
                         <ReservationScheduleBlock schedule={schedule} />
                         {temporal ? (
                           <span className="reservation-card__temporal">{temporal}</span>
@@ -207,6 +214,7 @@ export function MyReservationsPage() {
                           {branch.secondary ? <small>{branch.secondary}</small> : null}
                         </div>
                         <p className="reservation-card__ref">Referencia #{r.id}</p>
+                        <p className="reservation-card__policy">{getCancellationMessage(r)}</p>
                       </div>
                       <div
                         style={{
@@ -216,7 +224,7 @@ export function MyReservationsPage() {
                           gap: '0.5rem',
                         }}
                       >
-                        {canCancel(r) && (
+                        {r.cancellable && (
                           <button
                             type="button"
                             className="btn btn-logout"
@@ -242,7 +250,7 @@ export function MyReservationsPage() {
         title="¿Cancelar esta reserva?"
         description={
           confirmReservation
-            ? `Se marcará como cancelada la reserva #${confirmReservation.id} (${formatReservationSchedule(confirmReservation.startAt, confirmReservation.endAt).headline}).`
+            ? `Se marcará como cancelada la reserva #${confirmReservation.id} (${formatReservationSchedule(confirmReservation.startAt, confirmReservation.endAt).headline}). Esta acción solo está disponible antes del inicio.`
             : 'Esta acción marca la reserva como cancelada.'
         }
         confirmLabel={cancelMutation.isPending ? 'Cancelando…' : 'Sí, cancelar'}

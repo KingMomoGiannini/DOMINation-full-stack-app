@@ -48,7 +48,7 @@ public class ReservationService {
     public List<ReservationDTO> getMyReservations(String customerId) {
         log.debug("Obteniendo reservas del cliente: {}", customerId);
 
-        List<ReservationDTO> list = reservationRepository.findByCustomerId(customerId).stream()
+        List<ReservationDTO> list = reservationRepository.findByCustomerIdOrderByStartAtDescIdDesc(customerId).stream()
                 .map(reservationMapper::toDTO)
                 .collect(Collectors.toList());
         reservationDtoEnricher.enrichMissingCatalogFields(list);
@@ -81,9 +81,14 @@ public class ReservationService {
             }
             if (timeMode == ProviderReservationTimeMode.UPCOMING) {
                 predicates.add(cb.notEqual(root.get("status"), ReservationStatus.CANCELLED));
-                predicates.add(cb.greaterThanOrEqualTo(root.get("endAt"), now));
-            } else if (timeMode == ProviderReservationTimeMode.PAST) {
-                predicates.add(cb.lessThan(root.get("endAt"), now));
+                predicates.add(cb.greaterThan(root.get("startAt"), now));
+            } else if (timeMode == ProviderReservationTimeMode.IN_PROGRESS) {
+                predicates.add(cb.notEqual(root.get("status"), ReservationStatus.CANCELLED));
+                predicates.add(cb.lessThanOrEqualTo(root.get("startAt"), now));
+                predicates.add(cb.greaterThan(root.get("endAt"), now));
+            } else if (timeMode == ProviderReservationTimeMode.COMPLETED) {
+                predicates.add(cb.notEqual(root.get("status"), ReservationStatus.CANCELLED));
+                predicates.add(cb.lessThanOrEqualTo(root.get("endAt"), now));
             }
             if (windowFrom != null && windowTo != null) {
                 predicates.add(cb.lessThanOrEqualTo(root.get("startAt"), windowTo));
@@ -107,14 +112,7 @@ public class ReservationService {
 
     @Transactional(readOnly = true)
     public ProviderReservationMetricsDto getProviderReservationMetrics(Long providerId) {
-        LocalDateTime now = LocalDateTime.now();
-        long total = reservationRepository.countByProviderId(providerId);
-        long cancelled = reservationRepository.countByProviderIdAndStatus(providerId, ReservationStatus.CANCELLED);
-        long upcoming = reservationRepository.countByProviderIdAndStatusNotAndEndAtGreaterThanEqual(
-                providerId, ReservationStatus.CANCELLED, now);
-        long past = reservationRepository.countByProviderIdAndStatusNotAndEndAtBefore(
-                providerId, ReservationStatus.CANCELLED, now);
-        return new ProviderReservationMetricsDto(total, cancelled, upcoming, past);
+        return reservationRepository.fetchProviderReservationMetrics(providerId, LocalDateTime.now());
     }
 
     @Transactional
@@ -140,7 +138,7 @@ public class ReservationService {
                 .providerId(providerId)
                 .startAt(request.getStartAt())
                 .endAt(request.getEndAt())
-                .status(ReservationStatus.PENDING)
+                .status(ReservationStatus.CONFIRMED)
                 .lines(new ArrayList<>())
                 .build();
 

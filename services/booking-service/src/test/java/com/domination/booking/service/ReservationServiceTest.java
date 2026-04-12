@@ -5,6 +5,7 @@ import com.domination.booking.domain.ReservationLine;
 import com.domination.booking.domain.ReservationStatus;
 import com.domination.booking.dto.CreateReservationLineRequest;
 import com.domination.booking.dto.CreateReservationRequest;
+import com.domination.booking.dto.ProviderReservationMetricsDto;
 import com.domination.booking.dto.ReservationDTO;
 import com.domination.booking.exception.ConflictException;
 import com.domination.booking.exception.InsufficientStockException;
@@ -23,6 +24,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -44,6 +46,56 @@ class ReservationServiceTest {
     void stubEnricher() {
         lenient().doNothing().when(reservationDtoEnricher).enrichMissingCatalogFields(anyList());
         lenient().doNothing().when(reservationDtoEnricher).enrichCustomerUsernamesForProvider(anyList(), nullable(String.class));
+    }
+
+    @Test
+    void getMyReservations_readsOrderedHistory_andEnrichesResult() {
+        Reservation newest = Reservation.builder()
+                .id(2L)
+                .customerId("cust-1")
+                .branchId(10L)
+                .providerId(777L)
+                .startAt(LocalDateTime.now().plusDays(2))
+                .endAt(LocalDateTime.now().plusDays(2).plusHours(1))
+                .status(ReservationStatus.PENDING)
+                .lines(new ArrayList<>())
+                .build();
+        Reservation oldest = Reservation.builder()
+                .id(1L)
+                .customerId("cust-1")
+                .branchId(10L)
+                .providerId(777L)
+                .startAt(LocalDateTime.now().plusDays(1))
+                .endAt(LocalDateTime.now().plusDays(1).plusHours(1))
+                .status(ReservationStatus.CONFIRMED)
+                .lines(new ArrayList<>())
+                .build();
+
+        ReservationDTO dtoNewest = mock(ReservationDTO.class);
+        ReservationDTO dtoOldest = mock(ReservationDTO.class);
+
+        when(reservationRepository.findByCustomerIdOrderByStartAtDescIdDesc("cust-1"))
+                .thenReturn(List.of(newest, oldest));
+        when(reservationMapper.toDTO(newest)).thenReturn(dtoNewest);
+        when(reservationMapper.toDTO(oldest)).thenReturn(dtoOldest);
+
+        List<ReservationDTO> result = reservationService.getMyReservations("cust-1");
+
+        assertEquals(List.of(dtoNewest, dtoOldest), result);
+        verify(reservationRepository).findByCustomerIdOrderByStartAtDescIdDesc("cust-1");
+        verify(reservationDtoEnricher).enrichMissingCatalogFields(result);
+    }
+
+    @Test
+    void getProviderReservationMetrics_delegatesToSingleAggregateQuery() {
+        ProviderReservationMetricsDto metrics = new ProviderReservationMetricsDto(12, 2, 4, 3, 3);
+        when(reservationRepository.fetchProviderReservationMetrics(eq(777L), any(LocalDateTime.class)))
+                .thenReturn(metrics);
+
+        ProviderReservationMetricsDto result = reservationService.getProviderReservationMetrics(777L);
+
+        assertEquals(metrics, result);
+        verify(reservationRepository).fetchProviderReservationMetrics(eq(777L), any(LocalDateTime.class));
     }
 
     @Test
@@ -216,7 +268,7 @@ class ReservationServiceTest {
         assertEquals("Sede Test", saved.getBranchName());
         assertEquals(start, saved.getStartAt());
         assertEquals(end, saved.getEndAt());
-        assertEquals(ReservationStatus.PENDING, saved.getStatus());
+        assertEquals(ReservationStatus.CONFIRMED, saved.getStatus());
         assertNotNull(saved.getLines());
         assertEquals(1, saved.getLines().size());
 

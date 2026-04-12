@@ -3,11 +3,8 @@
  */
 
 export interface ReservationScheduleParts {
-  /** Título principal: día y fecha legibles */
   headline: string;
-  /** Franja horaria del mismo día (se asume misma zona que el backend) */
   timeRange: string;
-  /** Texto auxiliar si inicio y fin cruzan medianoche */
   crossDayNote: string | null;
 }
 
@@ -20,7 +17,7 @@ export function formatReservationSchedule(startAt: string, endAt: string): Reser
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
       return {
         headline: 'Fecha no disponible',
-        timeRange: `${startAt} → ${endAt}`,
+        timeRange: `${startAt} -> ${endAt}`,
         crossDayNote: null,
       };
     }
@@ -37,7 +34,7 @@ export function formatReservationSchedule(startAt: string, endAt: string): Reser
     });
 
     const headline = capitalizeEs(dayFmt.format(start));
-    const timeRange = `${timeFmt.format(start)} – ${timeFmt.format(end)}`;
+    const timeRange = `${timeFmt.format(start)} - ${timeFmt.format(end)}`;
 
     const sameCalendarDay =
       start.getFullYear() === end.getFullYear() &&
@@ -52,7 +49,7 @@ export function formatReservationSchedule(startAt: string, endAt: string): Reser
   } catch {
     return {
       headline: 'Fecha no disponible',
-      timeRange: `${startAt} → ${endAt}`,
+      timeRange: `${startAt} -> ${endAt}`,
       crossDayNote: null,
     };
   }
@@ -61,33 +58,75 @@ export function formatReservationSchedule(startAt: string, endAt: string): Reser
 export interface ReservationStatusMeta {
   label: string;
   hint: string;
-  modifier: 'pending' | 'confirmed' | 'cancelled' | 'unknown';
+  modifier:
+    | 'upcoming'
+    | 'in-progress'
+    | 'completed'
+    | 'cancelled'
+    | 'pending'
+    | 'confirmed'
+    | 'unknown';
 }
 
-export function getReservationStatusMeta(status: string): ReservationStatusMeta {
+export function getReservationOperationalMeta(status: string): ReservationStatusMeta {
   switch (status) {
-    case 'PENDING':
+    case 'UPCOMING':
       return {
-        label: 'Pendiente',
-        hint: 'La reserva está registrada; el estado puede actualizarse según las reglas del negocio.',
-        modifier: 'pending',
+        label: 'Próxima',
+        hint: 'La franja todavía no empezó.',
+        modifier: 'upcoming',
       };
-    case 'CONFIRMED':
+    case 'IN_PROGRESS':
       return {
-        label: 'Confirmada',
-        hint: 'Reserva activa para la franja indicada.',
-        modifier: 'confirmed',
+        label: 'En curso',
+        hint: 'La franja está corriendo ahora.',
+        modifier: 'in-progress',
+      };
+    case 'COMPLETED':
+      return {
+        label: 'Finalizada',
+        hint: 'La franja ya terminó.',
+        modifier: 'completed',
       };
     case 'CANCELLED':
       return {
         label: 'Cancelada',
-        hint: 'Esta reserva ya no aplica para la franja.',
+        hint: 'La reserva ya no aplica para esta franja.',
         modifier: 'cancelled',
       };
     default:
       return {
         label: status,
-        hint: 'Estado reportado por el servidor.',
+        hint: 'Estado operativo reportado por el servidor.',
+        modifier: 'unknown',
+      };
+  }
+}
+
+export function getReservationRecordMeta(status: string): ReservationStatusMeta {
+  switch (status) {
+    case 'PENDING':
+      return {
+        label: 'Registro pendiente',
+        hint: 'Persistido como pendiente; útil para compatibilidad y futuros flujos explícitos de confirmación.',
+        modifier: 'pending',
+      };
+    case 'CONFIRMED':
+      return {
+        label: 'Registro confirmado',
+        hint: 'Persistido como reserva activa.',
+        modifier: 'confirmed',
+      };
+    case 'CANCELLED':
+      return {
+        label: 'Registro cancelado',
+        hint: 'Persistido como cancelado.',
+        modifier: 'cancelled',
+      };
+    default:
+      return {
+        label: `Registro ${status}`,
+        hint: 'Estado persistido reportado por el servidor.',
         modifier: 'unknown',
       };
   }
