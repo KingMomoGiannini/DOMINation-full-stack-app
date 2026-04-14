@@ -5,14 +5,6 @@ import { cancelReservation, getBranches, getMyReservations } from '../../../api'
 import type { Reservation } from '../../../types/booking';
 import { branchesToMap, resolveReservationBranchDisplay } from '../../../utils/branchLookup';
 import {
-  formatReservationSchedule,
-  getReservationOperationalMeta,
-  getReservationRecordMeta,
-} from '../../../utils/reservationDisplay';
-import {
-  getCancellationMessage,
-  getReservationTemporalHint,
-  isReservationLiveNow,
   reservationMatchesFilters,
   sortReservations,
   type ReservationSortMode,
@@ -24,10 +16,9 @@ import { EmptyState } from '../../../components/ui/EmptyState';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
 import { QueryErrorPanel } from '../../../components/ui/QueryErrorPanel';
-import { ReservationStatusBadge } from '../../../components/reservations/ReservationStatusBadge';
-import { ReservationScheduleBlock } from '../../../components/reservations/ReservationScheduleBlock';
-import { ReservationLineItems } from '../../../components/reservations/ReservationLineItems';
 import { ReservationFiltersBar } from '../../../components/reservations/ReservationFiltersBar';
+import { ReservationDetailCard } from '../../../components/reservations/ReservationDetailCard';
+import { formatReservationSchedule } from '../../../utils/reservationDisplay';
 import { getApiErrorMessage } from '../../../utils/apiError';
 
 export function MyReservationsPage() {
@@ -188,56 +179,18 @@ export function MyReservationsPage() {
           ) : (
             <div className="reservation-list">
               {filteredSorted.map((r) => {
-                const schedule = formatReservationSchedule(r.startAt, r.endAt);
-                const operationalMeta = getReservationOperationalMeta(r.operationalStatus);
-                const recordMeta = getReservationRecordMeta(r.status);
                 const branch = renderBranch(r);
-                const temporal = getReservationTemporalHint(r);
-                const live = isReservationLiveNow(r);
                 return (
-                  <article
+                  <ReservationDetailCard
                     key={r.id}
-                      className={`reservation-card${live ? ' reservation-card--live' : ''}`}
-                  >
-                    <div className="reservation-card__top">
-                      <div className="reservation-card__main-col">
-                        <div className="reservation-card__badges">
-                          <ReservationStatusBadge meta={operationalMeta} />
-                          <ReservationStatusBadge meta={recordMeta} />
-                        </div>
-                        <ReservationScheduleBlock schedule={schedule} />
-                        {temporal ? (
-                          <span className="reservation-card__temporal">{temporal}</span>
-                        ) : null}
-                        <div className="reservation-card__branch">
-                          <strong>{branch.primary}</strong>
-                          {branch.secondary ? <small>{branch.secondary}</small> : null}
-                        </div>
-                        <p className="reservation-card__ref">Referencia #{r.id}</p>
-                        <p className="reservation-card__policy">{getCancellationMessage(r)}</p>
-                      </div>
-                      <div
-                        style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'flex-end',
-                          gap: '0.5rem',
-                        }}
-                      >
-                        {r.cancellable && (
-                          <button
-                            type="button"
-                            className="btn btn-logout"
-                            disabled={cancelMutation.isPending}
-                            onClick={() => setConfirmId(r.id)}
-                          >
-                            Cancelar reserva
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    <ReservationLineItems lines={r.lines ?? []} />
-                  </article>
+                    reservation={r}
+                    audience="user"
+                    branch={branch}
+                    cancelAction={{
+                      onRequestCancel: setConfirmId,
+                      loading: cancelMutation.isPending,
+                    }}
+                  />
                 );
               })}
             </div>

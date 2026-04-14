@@ -9,7 +9,7 @@ export function ReservationLineItems({ lines }: ReservationLineItemsProps) {
 
   return (
     <div className="reservation-lines">
-      <p className="reservation-lines__title">Detalle</p>
+      <p className="reservation-lines__title">Que incluye la reserva</p>
       <ul className="reservation-lines__list">
         {lines.map((line) => {
           const name = line.itemName?.trim();

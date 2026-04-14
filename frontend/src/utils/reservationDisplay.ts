@@ -1,23 +1,29 @@
+import type { ReservationLine } from '../types/booking';
+
 /**
- * Presentación de reservas para la UI (sin datos inventados; solo formateo).
+ * Presentation helpers for reservation cards.
+ * They only format data already present in the contract.
  */
 
 export interface ReservationScheduleParts {
   headline: string;
   timeRange: string;
+  durationLabel: string | null;
   crossDayNote: string | null;
 }
 
-const capitalizeEs = (s: string) => s.charAt(0).toLocaleUpperCase('es-AR') + s.slice(1);
+const capitalizeEs = (value: string) => value.charAt(0).toLocaleUpperCase('es-AR') + value.slice(1);
 
 export function formatReservationSchedule(startAt: string, endAt: string): ReservationScheduleParts {
   try {
     const start = new Date(startAt);
     const end = new Date(endAt);
+
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
       return {
         headline: 'Fecha no disponible',
         timeRange: `${startAt} -> ${endAt}`,
+        durationLabel: null,
         crossDayNote: null,
       };
     }
@@ -35,6 +41,7 @@ export function formatReservationSchedule(startAt: string, endAt: string): Reser
 
     const headline = capitalizeEs(dayFmt.format(start));
     const timeRange = `${timeFmt.format(start)} - ${timeFmt.format(end)}`;
+    const durationLabel = formatDurationLabel(start, end);
 
     const sameCalendarDay =
       start.getFullYear() === end.getFullYear() &&
@@ -45,13 +52,88 @@ export function formatReservationSchedule(startAt: string, endAt: string): Reser
       ? null
       : `La reserva termina el ${capitalizeEs(dayFmt.format(end))} a las ${timeFmt.format(end)}.`;
 
-    return { headline, timeRange, crossDayNote };
+    return { headline, timeRange, durationLabel, crossDayNote };
   } catch {
     return {
       headline: 'Fecha no disponible',
       timeRange: `${startAt} -> ${endAt}`,
+      durationLabel: null,
       crossDayNote: null,
     };
+  }
+}
+
+function formatDurationLabel(start: Date, end: Date): string | null {
+  const minutes = Math.max(0, Math.round((end.getTime() - start.getTime()) / 60000));
+  if (minutes <= 0) return null;
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+
+  if (hours > 0 && remainingMinutes > 0) {
+    return `${hours} h ${remainingMinutes} min`;
+  }
+  if (hours > 0) {
+    return `${hours} h`;
+  }
+  return `${remainingMinutes} min`;
+}
+
+export interface ReservationSubjectSummary {
+  title: string;
+  subtitle: string;
+}
+
+export function getReservationSubjectSummary(lines: ReservationLine[]): ReservationSubjectSummary {
+  const namedItems = Array.from(
+    new Set(
+      (lines ?? [])
+        .map((line) => line.itemName?.trim())
+        .filter((value): value is string => Boolean(value))
+    )
+  );
+
+  if (namedItems.length === 0) {
+    const count = lines?.length ?? 0;
+    return {
+      title: count > 0 ? `Reserva con ${count} item${count === 1 ? '' : 's'}` : 'Reserva registrada',
+      subtitle:
+        count > 0
+          ? 'El detalle existe, pero no llego enriquecido con nombres legibles.'
+          : 'Todavia no hay items visibles asociados a esta reserva.',
+    };
+  }
+
+  if (namedItems.length === 1) {
+    return {
+      title: namedItems[0],
+      subtitle: 'Reserva enfocada en un unico item o servicio.',
+    };
+  }
+
+  return {
+    title: namedItems[0],
+    subtitle:
+      namedItems.length === 2
+        ? `Incluye tambien ${namedItems[1]}.`
+        : `Incluye tambien ${namedItems[1]} y ${namedItems.length - 2} item${namedItems.length - 2 === 1 ? '' : 's'} mas.`,
+  };
+}
+
+export function formatReservationCreatedAt(createdAt: string): string {
+  try {
+    const created = new Date(createdAt);
+    if (Number.isNaN(created.getTime())) return 'Creada recientemente';
+
+    return new Intl.DateTimeFormat('es-AR', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(created);
+  } catch {
+    return 'Creada recientemente';
   }
 }
 
@@ -72,20 +154,20 @@ export function getReservationOperationalMeta(status: string): ReservationStatus
   switch (status) {
     case 'UPCOMING':
       return {
-        label: 'Próxima',
-        hint: 'La franja todavía no empezó.',
+        label: 'Proxima',
+        hint: 'La franja todavia no empezo.',
         modifier: 'upcoming',
       };
     case 'IN_PROGRESS':
       return {
         label: 'En curso',
-        hint: 'La franja está corriendo ahora.',
+        hint: 'La franja esta corriendo ahora.',
         modifier: 'in-progress',
       };
     case 'COMPLETED':
       return {
         label: 'Finalizada',
-        hint: 'La franja ya terminó.',
+        hint: 'La franja ya termino.',
         modifier: 'completed',
       };
     case 'CANCELLED':
@@ -108,7 +190,7 @@ export function getReservationRecordMeta(status: string): ReservationStatusMeta 
     case 'PENDING':
       return {
         label: 'Registro pendiente',
-        hint: 'Persistido como pendiente; útil para compatibilidad y futuros flujos explícitos de confirmación.',
+        hint: 'Persistido como pendiente; reservado para flujos futuros de confirmacion explicita.',
         modifier: 'pending',
       };
     case 'CONFIRMED':

@@ -646,54 +646,42 @@ body {
 .reservation-card {
   background: var(--secondary);
   border-radius: 12px;
-  padding: 1.5rem 1.75rem;
+  padding: 1.35rem 1.5rem 1.25rem;
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
   text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
-.reservation-card__top {
+.reservation-card__hero {
   display: flex;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 1.25rem;
   flex-wrap: wrap;
-  align-items: flex-start;
-}
-
-.reservation-card__branch {
-  font-family: 'Arial', sans-serif;
-  font-size: 1.05rem;
-  color: #fff;
-  margin-top: 0.35rem;
-  line-height: 1.45;
-}
-
-.reservation-card__branch small {
-  display: block;
-  color: var(--gray-light);
-  font-weight: 500;
-  margin-top: 0.2rem;
-  font-size: 0.9rem;
-}
-
-.reservation-card__ref {
-  font-family: 'Arial', sans-serif;
-  font-size: 0.8rem;
-  color: var(--gray-light);
-  margin-top: 0.75rem;
+  align-items: stretch;
 }
 
 .reservation-schedule-block {
-  margin-top: 0.25rem;
+  margin-top: 0.4rem;
 }
 
 .reservation-schedule-block__day {
   font-family: 'Bebas Neue', sans-serif;
-  font-size: 1.85rem;
+  font-size: 1.95rem;
   letter-spacing: 1px;
   color: var(--primary);
   margin: 0;
   line-height: 1.2;
+}
+
+.reservation-schedule-block__time-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 0.35rem;
 }
 
 .reservation-schedule-block__time {
@@ -701,7 +689,20 @@ body {
   font-size: 1.35rem;
   font-weight: 700;
   color: #fff;
-  margin: 0.35rem 0 0;
+  margin: 0;
+}
+
+.reservation-schedule-block__duration {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: var(--gray-light);
+  font-family: 'Arial', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 700;
 }
 
 .reservation-schedule-block__note {
@@ -766,7 +767,7 @@ body {
 }
 
 .reservation-lines {
-  margin-top: 1.25rem;
+  margin-top: 0;
   padding-top: 1rem;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
@@ -803,14 +804,6 @@ body {
 .reservation-lines__meta {
   font-size: 0.8rem;
   color: var(--gray-light);
-}
-
-.provider-customer-ref {
-  font-family: 'Arial', sans-serif;
-  font-size: 0.85rem;
-  color: var(--gray-light);
-  margin-top: 0.35rem;
-  line-height: 1.4;
 }
 
 /* Área prestador — navegación y resumen */
@@ -960,7 +953,7 @@ body {
 
 .reservation-card__temporal {
   display: inline-block;
-  margin-top: 0.5rem;
+  margin-top: 0.65rem;
   font-family: 'Arial', sans-serif;
   font-size: 0.8rem;
   font-weight: 700;
@@ -973,20 +966,140 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 0.45rem;
-  margin-bottom: 0.35rem;
-}
-
-.reservation-card__policy {
-  font-family: 'Arial', sans-serif;
-  font-size: 0.85rem;
-  color: var(--gray-light);
-  margin-top: 0.55rem;
-  line-height: 1.45;
+  margin-bottom: 0.55rem;
 }
 
 .reservation-card__main-col {
   flex: 1;
   min-width: 0;
+}
+
+.reservation-card__eyebrow {
+  font-family: 'Arial', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--gray-light);
+  margin: 0 0 0.3rem;
+}
+
+.reservation-card__title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 2rem;
+  letter-spacing: 1.5px;
+  color: #fff;
+  margin: 0;
+  line-height: 1.05;
+}
+
+.reservation-card__summary {
+  font-family: 'Arial', sans-serif;
+  font-size: 0.95rem;
+  color: #e7e7e7;
+  line-height: 1.5;
+  margin: 0.35rem 0 0;
+  max-width: 48rem;
+}
+
+.reservation-card__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 0.65rem;
+  min-width: min(100%, 17rem);
+}
+
+.reservation-card__action-note {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 0.85rem 0.95rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.reservation-card__action-label {
+  font-family: 'Arial', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--gray-light);
+}
+
+.reservation-card__action-note strong {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.4rem;
+  letter-spacing: 1px;
+  color: #fff;
+}
+
+.reservation-card__action-note small {
+  font-family: 'Arial', sans-serif;
+  font-size: 0.82rem;
+  color: var(--gray-light);
+  line-height: 1.4;
+}
+
+.reservation-card__facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 0.85rem;
+}
+
+.reservation-detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.9rem 0.95rem;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.reservation-detail-item--positive {
+  background: rgba(0, 160, 0, 0.12);
+  border-color: rgba(0, 200, 80, 0.25);
+}
+
+.reservation-detail-item__label {
+  font-family: 'Arial', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--gray-light);
+}
+
+.reservation-detail-item strong {
+  font-family: 'Arial', sans-serif;
+  font-size: 1rem;
+  color: #fff;
+  line-height: 1.35;
+}
+
+.reservation-detail-item small {
+  font-family: 'Arial', sans-serif;
+  font-size: 0.82rem;
+  color: var(--gray-light);
+  line-height: 1.45;
+}
+
+.reservation-card__secondary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  padding-top: 0.15rem;
+  font-family: 'Arial', sans-serif;
+  font-size: 0.78rem;
+  color: var(--gray-light);
+}
+
+.reservation-card__secondary span {
+  opacity: 0.9;
 }
 
 /* Área admin — solicitudes prestador */
@@ -1189,5 +1302,31 @@ body {
   font-family: 'Arial', sans-serif;
   font-size: 0.9rem;
   color: var(--gray-light);
+}
+
+@media (max-width: 760px) {
+  .reservation-card {
+    padding: 1.15rem 1rem;
+  }
+
+  .reservation-card__hero {
+    gap: 1rem;
+  }
+
+  .reservation-card__title {
+    font-size: 1.65rem;
+  }
+
+  .reservation-card__actions {
+    min-width: 100%;
+  }
+
+  .reservation-card__actions .btn {
+    width: 100%;
+  }
+
+  .reservation-card__facts {
+    grid-template-columns: 1fr;
+  }
 }
 

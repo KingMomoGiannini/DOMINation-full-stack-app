@@ -6,8 +6,10 @@ export type ReservationSortMode = 'START_DESC' | 'START_ASC';
 
 function deriveOperationalStatusFallback(r: Reservation, nowMs: number): Reservation['operationalStatus'] {
   if (r.status === 'CANCELLED') return 'CANCELLED';
+
   const start = new Date(r.startAt).getTime();
   const end = new Date(r.endAt).getTime();
+
   if (Number.isNaN(start) || Number.isNaN(end)) return 'UPCOMING';
   if (nowMs < start) return 'UPCOMING';
   if (nowMs < end) return 'IN_PROGRESS';
@@ -65,16 +67,17 @@ export function getReservationTemporalHint(r: Reservation, nowMs?: number): stri
 
   if (start >= dayStart.getTime() && start < dayEnd.getTime()) return 'Hoy';
 
-  const tom = new Date(dayStart);
-  tom.setDate(tom.getDate() + 1);
-  const tomEnd = new Date(tom);
-  tomEnd.setDate(tomEnd.getDate() + 1);
-  if (start >= tom.getTime() && start < tomEnd.getTime()) return 'Mañana';
+  const tomorrow = new Date(dayStart);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowEnd = new Date(tomorrow);
+  tomorrowEnd.setDate(tomorrowEnd.getDate() + 1);
+
+  if (start >= tomorrow.getTime() && start < tomorrowEnd.getTime()) return 'Mañana';
 
   const diffDays = Math.ceil((start - dayStart.getTime()) / (86400 * 1000));
   if (diffDays === 2) return 'Pasado mañana';
-  if (diffDays > 2 && diffDays <= 14) return `En ${diffDays} días`;
-  return 'Próxima';
+  if (diffDays > 2 && diffDays <= 14) return `En ${diffDays} dias`;
+  return 'Proxima';
 }
 
 export function isReservationLiveNow(r: Reservation, nowMs?: number): boolean {
@@ -83,13 +86,13 @@ export function isReservationLiveNow(r: Reservation, nowMs?: number): boolean {
 
 export function getCancellationMessage(r: Reservation): string {
   if (r.cancellable) {
-    return 'Se puede cancelar antes del inicio de la franja.';
+    return 'Disponible hasta antes del inicio de la franja.';
   }
   if (r.cancellationBlockReason === 'ALREADY_CANCELLED') {
-    return 'Ya fue cancelada.';
+    return 'No hace falta cancelarla: la reserva ya figura como cancelada.';
   }
   if (r.cancellationBlockReason === 'ALREADY_STARTED') {
-    return 'Solo puede cancelarse antes del inicio.';
+    return 'No puede cancelarse porque la franja ya comenzo o ya paso.';
   }
-  return 'La cancelación depende de la regla vigente del backend.';
+  return 'La accion queda sujeta a la politica vigente informada por el backend.';
 }

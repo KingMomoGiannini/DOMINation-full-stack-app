@@ -8,7 +8,12 @@ export function ReservationScheduleBlock({ schedule }: ReservationScheduleBlockP
   return (
     <div className="reservation-schedule-block">
       <p className="reservation-schedule-block__day">{schedule.headline}</p>
-      <p className="reservation-schedule-block__time">{schedule.timeRange}</p>
+      <div className="reservation-schedule-block__time-row">
+        <p className="reservation-schedule-block__time">{schedule.timeRange}</p>
+        {schedule.durationLabel ? (
+          <span className="reservation-schedule-block__duration">{schedule.durationLabel}</span>
+        ) : null}
+      </div>
       {schedule.crossDayNote ? (
         <p className="reservation-schedule-block__note">{schedule.crossDayNote}</p>
       ) : null}
