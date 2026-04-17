@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/catalog/admin")
 @RequiredArgsConstructor
 @Tag(name = "Admin", description = "API de administración (requiere JWT + ROLE_ADMIN)")
-@SecurityRequirement(name = "bearer-jwt")
+@SecurityRequirement(name = "bearerAuth")
 public class AdminController {
 
     private final BranchService branchService;

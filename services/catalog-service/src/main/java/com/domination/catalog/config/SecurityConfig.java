@@ -22,7 +22,7 @@ import java.util.Arrays;
  * ENDPOINTS PÚBLICOS:
  * - GET /api/catalog/branches/** (listar sucursales)
  * - GET /api/catalog/items/** (listar items)
- * - /swagger-ui/**, /v3/api-docs/**, /actuator/**
+ * - /api-docs, /api-docs/**, /swagger-ui/**, /swagger-ui.html, /v3/api-docs/**, /actuator/**
  * 
  * ENDPOINTS PROTEGIDOS:
  * - /api/catalog/provider/** -> @PreAuthorize("hasAnyRole('PROVIDER','ADMIN')")
@@ -52,7 +52,13 @@ public class SecurityConfig {
                 
                 // Swagger & Actuator públicos
                 .requestMatchers("/actuator/**").permitAll()
-                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
+                .requestMatchers(
+                        "/swagger-ui/**",
+                        "/swagger-ui.html",
+                        "/v3/api-docs/**",
+                        "/api-docs",
+                        "/api-docs/**"
+                ).permitAll()
                 
                 // Admin endpoints requieren ROLE_ADMIN (por URL)
                 .requestMatchers("/api/catalog/admin/**").hasRole("ADMIN")

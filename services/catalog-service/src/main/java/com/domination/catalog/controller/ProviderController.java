@@ -7,6 +7,8 @@ import com.domination.catalog.dto.RoomCreateRequest;
 import com.domination.catalog.dto.UpdateActiveRequest;
 import com.domination.catalog.service.BranchService;
 import com.domination.catalog.service.ItemService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +30,8 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 @PreAuthorize("hasAnyRole('PROVIDER','ADMIN')")
+@Tag(name = "Provider", description = "API de provider para gestionar sucursales y salas propias")
+@SecurityRequirement(name = "bearerAuth")
 public class ProviderController {
     
     private final BranchService branchService;
