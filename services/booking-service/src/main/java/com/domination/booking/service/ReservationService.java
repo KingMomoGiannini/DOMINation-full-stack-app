@@ -8,6 +8,7 @@ import com.domination.booking.dto.AvailabilityResponse;
 import com.domination.booking.dto.CreateReservationLineRequest;
 import com.domination.booking.dto.CreateReservationRequest;
 import com.domination.booking.dto.ProviderReservationMetricsDto;
+import com.domination.booking.dto.ProviderReservationAttendanceFilter;
 import com.domination.booking.dto.ProviderReservationTimeMode;
 import com.domination.booking.dto.ReservationDTO;
 import com.domination.booking.exception.ConflictException;
@@ -43,6 +44,7 @@ public class ReservationService {
     private final ReservationMapper reservationMapper;
     private final CatalogClient catalogClient;
     private final ReservationDtoEnricher reservationDtoEnricher;
+    private final ReservationLifecycleResolver reservationLifecycleResolver;
 
     @Transactional(readOnly = true)
     public List<ReservationDTO> getMyReservations(String customerId) {
@@ -60,14 +62,15 @@ public class ReservationService {
             Long providerId,
             Long branchId,
             ReservationStatus status,
+            ProviderReservationAttendanceFilter attendance,
             ProviderReservationTimeMode timeMode,
             LocalDateTime windowFrom,
             LocalDateTime windowTo,
             Pageable pageable,
             String authorizationHeader) {
         log.debug(
-                "Listado paginado provider {} branchId={} status={} time={} window=[{},{}] page={}",
-                providerId, branchId, status, timeMode, windowFrom, windowTo, pageable.getPageNumber());
+                "Listado paginado provider {} branchId={} status={} attendance={} time={} window=[{},{}] page={}",
+                providerId, branchId, status, attendance, timeMode, windowFrom, windowTo, pageable.getPageNumber());
 
         LocalDateTime now = LocalDateTime.now();
         Specification<Reservation> spec = (root, query, cb) -> {
@@ -78,6 +81,17 @@ public class ReservationService {
             }
             if (status != null) {
                 predicates.add(cb.equal(root.get("status"), status));
+            }
+            if (attendance == ProviderReservationAttendanceFilter.CHECKED_IN) {
+                predicates.add(cb.isNotNull(root.get("checkedInAt")));
+            } else if (attendance == ProviderReservationAttendanceFilter.NO_SHOW) {
+                predicates.add(cb.isNotNull(root.get("noShowMarkedAt")));
+            } else if (attendance == ProviderReservationAttendanceFilter.NOT_RECORDED) {
+                predicates.add(cb.notEqual(root.get("status"), ReservationStatus.CANCELLED));
+                predicates.add(cb.isNull(root.get("checkedInAt")));
+                predicates.add(cb.isNull(root.get("noShowMarkedAt")));
+            } else if (attendance == ProviderReservationAttendanceFilter.NOT_APPLICABLE) {
+                predicates.add(cb.equal(root.get("status"), ReservationStatus.CANCELLED));
             }
             if (timeMode == ProviderReservationTimeMode.UPCOMING) {
                 predicates.add(cb.notEqual(root.get("status"), ReservationStatus.CANCELLED));
@@ -394,6 +408,62 @@ public class ReservationService {
         ReservationDTO dto = reservationMapper.toDTO(saved);
         reservationDtoEnricher.enrichMissingCatalogFields(List.of(dto));
         return dto;
+    }
+
+    @Transactional
+    public ReservationDTO providerCheckInReservation(Long reservationId, Long providerId, String authorizationHeader) {
+        Reservation reservation = reservationRepository.findByIdAndProviderId(reservationId, providerId)
+                .orElseThrow(() -> new NotFoundException("Reserva no encontrada"));
+        LocalDateTime now = LocalDateTime.now();
+        if (!reservationLifecycleResolver.isProviderCheckInAllowed(reservation, now)) {
+            throw new ConflictException(buildProviderCheckInConflictMessage(reservation, now));
+        }
+        reservation.setCheckedInAt(now);
+        reservation.setNoShowMarkedAt(null);
+        Reservation saved = reservationRepository.save(reservation);
+        return mapProviderReservation(saved, authorizationHeader);
+    }
+
+    @Transactional
+    public ReservationDTO providerMarkNoShow(Long reservationId, Long providerId, String authorizationHeader) {
+        Reservation reservation = reservationRepository.findByIdAndProviderId(reservationId, providerId)
+                .orElseThrow(() -> new NotFoundException("Reserva no encontrada"));
+        LocalDateTime now = LocalDateTime.now();
+        if (!reservationLifecycleResolver.isProviderMarkNoShowAllowed(reservation, now)) {
+            throw new ConflictException(buildProviderNoShowConflictMessage(reservation, now));
+        }
+        reservation.setNoShowMarkedAt(now);
+        reservation.setCheckedInAt(null);
+        Reservation saved = reservationRepository.save(reservation);
+        return mapProviderReservation(saved, authorizationHeader);
+    }
+
+    private ReservationDTO mapProviderReservation(Reservation reservation, String authorizationHeader) {
+        ReservationDTO dto = reservationMapper.toDTO(reservation);
+        reservationDtoEnricher.enrichMissingCatalogFields(List.of(dto));
+        reservationDtoEnricher.enrichCustomerUsernamesForProvider(List.of(dto), authorizationHeader);
+        return dto;
+    }
+
+    private String buildProviderCheckInConflictMessage(Reservation reservation, LocalDateTime now) {
+        return switch (reservationLifecycleResolver.resolveProviderCheckInBlockReason(reservation, now)) {
+            case CANCELLED -> "No se puede registrar check-in sobre una reserva cancelada";
+            case ALREADY_CHECKED_IN -> "La reserva ya tiene un check-in registrado";
+            case ALREADY_MARKED_NO_SHOW -> "La reserva ya fue marcada como no-show";
+            case BEFORE_START -> "El check-in solo puede registrarse desde el inicio de la franja";
+            case AFTER_END -> "La franja ya terminó; ya no corresponde registrar check-in";
+            default -> "El check-in no está disponible para esta reserva";
+        };
+    }
+
+    private String buildProviderNoShowConflictMessage(Reservation reservation, LocalDateTime now) {
+        return switch (reservationLifecycleResolver.resolveProviderMarkNoShowBlockReason(reservation, now)) {
+            case CANCELLED -> "No se puede marcar no-show sobre una reserva cancelada";
+            case ALREADY_CHECKED_IN -> "La reserva ya tiene un check-in registrado";
+            case ALREADY_MARKED_NO_SHOW -> "La reserva ya fue marcada como no-show";
+            case BEFORE_END -> "El no-show solo puede marcarse cuando la franja ya terminó";
+            default -> "No se puede marcar no-show para esta reserva";
+        };
     }
 
     private void releaseCreatedHoldsBestEffort(List<String> holdIds) {

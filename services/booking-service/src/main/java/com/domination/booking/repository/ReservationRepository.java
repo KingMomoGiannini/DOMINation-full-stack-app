@@ -26,7 +26,9 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long>,
                 coalesce(sum(case when r.status = com.domination.booking.domain.ReservationStatus.CANCELLED then 1 else 0 end), 0),
                 coalesce(sum(case when r.status <> com.domination.booking.domain.ReservationStatus.CANCELLED and r.startAt > :now then 1 else 0 end), 0),
                 coalesce(sum(case when r.status <> com.domination.booking.domain.ReservationStatus.CANCELLED and r.startAt <= :now and r.endAt > :now then 1 else 0 end), 0),
-                coalesce(sum(case when r.status <> com.domination.booking.domain.ReservationStatus.CANCELLED and r.endAt <= :now then 1 else 0 end), 0)
+                coalesce(sum(case when r.status <> com.domination.booking.domain.ReservationStatus.CANCELLED and r.endAt <= :now then 1 else 0 end), 0),
+                coalesce(sum(case when r.checkedInAt is not null then 1 else 0 end), 0),
+                coalesce(sum(case when r.noShowMarkedAt is not null then 1 else 0 end), 0)
             )
             from Reservation r
             where r.providerId = :providerId
@@ -71,6 +73,8 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long>,
     );
 
     Optional<Reservation> findByIdAndCustomerId(Long id, String customerId);
+
+    Optional<Reservation> findByIdAndProviderId(Long id, Long providerId);
 
 }
 

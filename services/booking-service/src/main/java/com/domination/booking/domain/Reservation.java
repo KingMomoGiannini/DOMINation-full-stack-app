@@ -61,6 +61,18 @@ public class Reservation {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    /**
+     * Hecho operativo persistido: el prestador registró que el cliente se presentó.
+     */
+    @Column(name = "checked_in_at")
+    private LocalDateTime checkedInAt;
+
+    /**
+     * Hecho operativo persistido: el prestador marcó no-show una vez finalizada la franja.
+     */
+    @Column(name = "no_show_marked_at")
+    private LocalDateTime noShowMarkedAt;
+
     @OneToMany(mappedBy = "reservation", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<ReservationLine> lines = new ArrayList<>();

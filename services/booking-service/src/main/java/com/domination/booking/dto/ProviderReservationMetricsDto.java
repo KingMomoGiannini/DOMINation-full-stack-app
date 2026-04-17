@@ -8,4 +8,6 @@ public record ProviderReservationMetricsDto(
         long cancelled,
         long upcoming,
         long inProgress,
-        long completed) {}
+        long completed,
+        long checkedIn,
+        long noShow) {}

@@ -20,8 +20,29 @@ export interface Reservation {
   endAt: string;
   status: 'PENDING' | 'CONFIRMED' | 'CANCELLED';
   operationalStatus: 'UPCOMING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  attendanceStatus: 'NOT_RECORDED' | 'CHECKED_IN' | 'NO_SHOW' | 'NOT_APPLICABLE';
   cancellable: boolean;
   cancellationBlockReason?: 'ALREADY_CANCELLED' | 'ALREADY_STARTED' | null;
+  checkedInAt?: string | null;
+  noShowMarkedAt?: string | null;
+  providerCheckInAllowed: boolean;
+  providerCheckInBlockReason?:
+    | 'CANCELLED'
+    | 'ALREADY_CHECKED_IN'
+    | 'ALREADY_MARKED_NO_SHOW'
+    | 'BEFORE_START'
+    | 'AFTER_END'
+    | 'BEFORE_END'
+    | null;
+  providerMarkNoShowAllowed: boolean;
+  providerMarkNoShowBlockReason?:
+    | 'CANCELLED'
+    | 'ALREADY_CHECKED_IN'
+    | 'ALREADY_MARKED_NO_SHOW'
+    | 'BEFORE_START'
+    | 'AFTER_END'
+    | 'BEFORE_END'
+    | null;
   createdAt: string;
   lines: ReservationLine[];
 }

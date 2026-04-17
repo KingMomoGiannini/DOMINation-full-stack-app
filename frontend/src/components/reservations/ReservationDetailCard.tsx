@@ -1,12 +1,20 @@
 import type { Reservation } from '../../types/booking';
 import {
   formatReservationCreatedAt,
+  getReservationAttendanceMeta,
   formatReservationSchedule,
   getReservationOperationalMeta,
   getReservationRecordMeta,
   getReservationSubjectSummary,
 } from '../../utils/reservationDisplay';
-import { getCancellationMessage, getReservationTemporalHint, isReservationLiveNow } from '../../utils/reservationUi';
+import {
+  getAttendanceMessage,
+  getCancellationMessage,
+  getProviderCheckInMessage,
+  getProviderNoShowMessage,
+  getReservationTemporalHint,
+  isReservationLiveNow,
+} from '../../utils/reservationUi';
 import { ReservationLineItems } from './ReservationLineItems';
 import { ReservationScheduleBlock } from './ReservationScheduleBlock';
 import { ReservationStatusBadge } from './ReservationStatusBadge';
@@ -20,6 +28,11 @@ interface ReservationDetailCardProps {
   };
   cancelAction?: {
     onRequestCancel: (reservationId: number) => void;
+    loading: boolean;
+  };
+  providerActions?: {
+    onRequestCheckIn: (reservationId: number) => void;
+    onRequestNoShow: (reservationId: number) => void;
     loading: boolean;
   };
 }
@@ -60,10 +73,12 @@ export function ReservationDetailCard({
   audience,
   branch,
   cancelAction,
+  providerActions,
 }: ReservationDetailCardProps) {
   const schedule = formatReservationSchedule(reservation.startAt, reservation.endAt);
   const operationalMeta = getReservationOperationalMeta(reservation.operationalStatus);
   const recordMeta = getReservationRecordMeta(reservation.status);
+  const attendanceMeta = getReservationAttendanceMeta(reservation.attendanceStatus);
   const subject = getReservationSubjectSummary(reservation.lines ?? []);
   const temporal = getReservationTemporalHint(reservation);
   const live = isReservationLiveNow(reservation);
@@ -76,6 +91,7 @@ export function ReservationDetailCard({
           <div className="reservation-card__badges">
             <ReservationStatusBadge meta={operationalMeta} />
             <ReservationStatusBadge meta={recordMeta} />
+            <ReservationStatusBadge meta={attendanceMeta} />
           </div>
           <p className="reservation-card__eyebrow">{getEyebrow(reservation, audience)}</p>
           <h3 className="reservation-card__title">{subject.title}</h3>
@@ -102,6 +118,29 @@ export function ReservationDetailCard({
                 <small>{getCancellationMessage(reservation)}</small>
               </div>
             )}
+          </div>
+        ) : null}
+
+        {providerActions ? (
+          <div className="reservation-card__actions">
+            <button
+              type="button"
+              className="btn btn-success"
+              disabled={!reservation.providerCheckInAllowed || providerActions.loading}
+              onClick={() => providerActions.onRequestCheckIn(reservation.id)}
+            >
+              Registrar check-in
+            </button>
+            <small className="reservation-card__action-note">{getProviderCheckInMessage(reservation)}</small>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={!reservation.providerMarkNoShowAllowed || providerActions.loading}
+              onClick={() => providerActions.onRequestNoShow(reservation.id)}
+            >
+              Marcar no-show
+            </button>
+            <small className="reservation-card__action-note">{getProviderNoShowMessage(reservation)}</small>
           </div>
         ) : null}
       </div>
@@ -133,6 +172,12 @@ export function ReservationDetailCard({
           <span className="reservation-detail-item__label">Cancelacion</span>
           <strong>{reservation.cancellable ? 'Disponible' : 'No disponible'}</strong>
           <small>{getCancellationMessage(reservation)}</small>
+        </div>
+
+        <div className="reservation-detail-item">
+          <span className="reservation-detail-item__label">Operacion real</span>
+          <strong>{attendanceMeta.label}</strong>
+          <small>{getAttendanceMessage(reservation)}</small>
         </div>
       </div>
 

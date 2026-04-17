@@ -1,4 +1,9 @@
-import type { ReservationSortMode, ReservationStatusFilter, ReservationTimeFilter } from '../../utils/reservationUi';
+import type {
+  ReservationAttendanceFilter,
+  ReservationSortMode,
+  ReservationStatusFilter,
+  ReservationTimeFilter,
+} from '../../utils/reservationUi';
 
 export interface BranchOption {
   id: number;
@@ -10,10 +15,12 @@ interface ReservationFiltersBarProps {
   branchId: number | 'ALL';
   status: ReservationStatusFilter;
   time: ReservationTimeFilter;
+  attendance?: ReservationAttendanceFilter;
   sort: ReservationSortMode;
   onBranchId: (v: number | 'ALL') => void;
   onStatus: (v: ReservationStatusFilter) => void;
   onTime: (v: ReservationTimeFilter) => void;
+  onAttendance?: (v: ReservationAttendanceFilter) => void;
   onSort: (v: ReservationSortMode) => void;
   showBranchFilter: boolean;
   idPrefix: string;
@@ -29,10 +36,12 @@ export function ReservationFiltersBar({
   branchId,
   status,
   time,
+  attendance = 'ALL',
   sort,
   onBranchId,
   onStatus,
   onTime,
+  onAttendance,
   onSort,
   showBranchFilter,
   idPrefix,
@@ -90,6 +99,22 @@ export function ReservationFiltersBar({
           <option value="COMPLETED">Finalizadas</option>
         </select>
       </div>
+      {onAttendance ? (
+        <div className="reservation-filters__field">
+          <label htmlFor={`${idPrefix}-attendance`}>Operacion</label>
+          <select
+            id={`${idPrefix}-attendance`}
+            value={attendance}
+            onChange={(e) => onAttendance(e.target.value as ReservationAttendanceFilter)}
+          >
+            <option value="ALL">Todas</option>
+            <option value="NOT_RECORDED">Sin registrar</option>
+            <option value="CHECKED_IN">Con check-in</option>
+            <option value="NO_SHOW">No-show</option>
+            <option value="NOT_APPLICABLE">No aplica</option>
+          </select>
+        </div>
+      ) : null}
       <div className="reservation-filters__field">
         <label htmlFor={`${idPrefix}-sort`}>Orden</label>
         <select

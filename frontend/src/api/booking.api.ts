@@ -41,6 +41,7 @@ export interface ProviderReservationsQuery {
   size?: number;
   branchId?: number;
   status?: 'PENDING' | 'CONFIRMED' | 'CANCELLED';
+  attendance?: 'ALL' | 'NOT_RECORDED' | 'CHECKED_IN' | 'NO_SHOW' | 'NOT_APPLICABLE';
   time?: 'ALL' | 'UPCOMING' | 'IN_PROGRESS' | 'COMPLETED';
   from?: string;
   to?: string;
@@ -53,6 +54,8 @@ export interface ProviderReservationMetrics {
   upcoming: number;
   inProgress: number;
   completed: number;
+  checkedIn: number;
+  noShow: number;
 }
 
 export const getProviderReservationsPage = async (
@@ -62,6 +65,7 @@ export const getProviderReservationsPage = async (
   params.set('page', String(q.page ?? 0));
   params.set('size', String(q.size ?? 15));
   params.set('time', q.time ?? 'ALL');
+  params.set('attendance', q.attendance ?? 'ALL');
   params.set('sort', q.sort ?? 'startAt,desc');
   if (q.branchId != null) params.set('branchId', String(q.branchId));
   if (q.status != null) params.set('status', q.status);
@@ -75,5 +79,15 @@ export const getProviderReservationsPage = async (
 
 export const getProviderReservationMetrics = async (): Promise<ProviderReservationMetrics> => {
   const { data } = await http.get<ProviderReservationMetrics>('/api/booking/provider/reservations/metrics');
+  return data;
+};
+
+export const providerCheckInReservation = async (id: number): Promise<Reservation> => {
+  const { data } = await http.post<Reservation>(`/api/booking/provider/reservations/${id}/check-in`);
+  return data;
+};
+
+export const providerMarkNoShowReservation = async (id: number): Promise<Reservation> => {
+  const { data } = await http.post<Reservation>(`/api/booking/provider/reservations/${id}/no-show`);
   return data;
 };

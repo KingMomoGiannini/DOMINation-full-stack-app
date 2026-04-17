@@ -213,3 +213,32 @@ export function getReservationRecordMeta(status: string): ReservationStatusMeta 
       };
   }
 }
+
+export function getReservationAttendanceMeta(status: string): ReservationStatusMeta {
+  switch (status) {
+    case 'CHECKED_IN':
+      return {
+        label: 'Check-in',
+        hint: 'Hay registro operativo de llegada del cliente.',
+        modifier: 'confirmed',
+      };
+    case 'NO_SHOW':
+      return {
+        label: 'No-show',
+        hint: 'El prestador registró ausencia del cliente.',
+        modifier: 'cancelled',
+      };
+    case 'NOT_APPLICABLE':
+      return {
+        label: 'Sin asistencia',
+        hint: 'No aplica porque la reserva fue cancelada.',
+        modifier: 'pending',
+      };
+    default:
+      return {
+        label: 'Sin registro',
+        hint: 'Todavía no hay un hecho operativo persistido.',
+        modifier: 'upcoming',
+      };
+  }
+}

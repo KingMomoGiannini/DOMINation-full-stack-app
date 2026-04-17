@@ -8,6 +8,8 @@ export interface ProviderStatsSummaryProps {
   reservationsInProgress: number;
   reservationsCompleted: number;
   reservationsCancelled: number;
+  reservationsCheckedIn: number;
+  reservationsNoShow: number;
   roomsLoading: boolean;
   reservationsLoading: boolean;
 }
@@ -22,6 +24,8 @@ export function ProviderStatsSummary({
   reservationsInProgress,
   reservationsCompleted,
   reservationsCancelled,
+  reservationsCheckedIn,
+  reservationsNoShow,
   roomsLoading,
   reservationsLoading,
 }: ProviderStatsSummaryProps) {
@@ -60,7 +64,8 @@ export function ProviderStatsSummary({
               <span className="provider-stat-card__value">{reservationsTotal}</span>
               <span className="provider-stat-card__hint">
                 {reservationsUpcoming} próximas · {reservationsInProgress} en curso · {reservationsCompleted}{' '}
-                finalizadas · {reservationsCancelled} canceladas
+                finalizadas · {reservationsCancelled} canceladas · {reservationsCheckedIn} con check-in ·{' '}
+                {reservationsNoShow} no-show
               </span>
             </>
           )}

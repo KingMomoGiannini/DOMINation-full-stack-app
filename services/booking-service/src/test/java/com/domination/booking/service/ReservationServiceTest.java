@@ -20,6 +20,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
@@ -39,6 +40,7 @@ class ReservationServiceTest {
     @Mock private ReservationMapper reservationMapper;
     @Mock private CatalogClient catalogClient;
     @Mock private ReservationDtoEnricher reservationDtoEnricher;
+    @Spy private ReservationLifecycleResolver reservationLifecycleResolver;
 
     @InjectMocks private ReservationService reservationService;
 
@@ -88,7 +90,7 @@ class ReservationServiceTest {
 
     @Test
     void getProviderReservationMetrics_delegatesToSingleAggregateQuery() {
-        ProviderReservationMetricsDto metrics = new ProviderReservationMetricsDto(12, 2, 4, 3, 3);
+        ProviderReservationMetricsDto metrics = new ProviderReservationMetricsDto(12, 2, 4, 3, 3, 5, 1);
         when(reservationRepository.fetchProviderReservationMetrics(eq(777L), any(LocalDateTime.class)))
                 .thenReturn(metrics);
 
@@ -402,6 +404,84 @@ class ReservationServiceTest {
 
         assertSame(dto, result);
         verify(catalogClient, never()).releaseInventory(any());
+        verify(reservationRepository, never()).save(any());
+    }
+
+    @Test
+    void providerCheckIn_persistsTimestamp_whenReservationIsLive() {
+        Reservation reservation = Reservation.builder()
+                .id(22L)
+                .customerId("cust-1")
+                .branchId(10L)
+                .providerId(777L)
+                .startAt(LocalDateTime.now().minusMinutes(20))
+                .endAt(LocalDateTime.now().plusMinutes(40))
+                .status(ReservationStatus.CONFIRMED)
+                .lines(new ArrayList<>())
+                .build();
+
+        when(reservationRepository.findByIdAndProviderId(22L, 777L)).thenReturn(Optional.of(reservation));
+        when(reservationRepository.save(any(Reservation.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ReservationDTO dto = mock(ReservationDTO.class);
+        when(reservationMapper.toDTO(any(Reservation.class))).thenReturn(dto);
+
+        ReservationDTO result = reservationService.providerCheckInReservation(22L, 777L, "Bearer token");
+
+        assertSame(dto, result);
+        assertNotNull(reservation.getCheckedInAt());
+        assertNull(reservation.getNoShowMarkedAt());
+        verify(reservationDtoEnricher).enrichCustomerUsernamesForProvider(anyList(), eq("Bearer token"));
+    }
+
+    @Test
+    void providerMarkNoShow_persistsTimestamp_whenReservationAlreadyEnded() {
+        Reservation reservation = Reservation.builder()
+                .id(23L)
+                .customerId("cust-1")
+                .branchId(10L)
+                .providerId(777L)
+                .startAt(LocalDateTime.now().minusHours(2))
+                .endAt(LocalDateTime.now().minusMinutes(10))
+                .status(ReservationStatus.CONFIRMED)
+                .lines(new ArrayList<>())
+                .build();
+
+        when(reservationRepository.findByIdAndProviderId(23L, 777L)).thenReturn(Optional.of(reservation));
+        when(reservationRepository.save(any(Reservation.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ReservationDTO dto = mock(ReservationDTO.class);
+        when(reservationMapper.toDTO(any(Reservation.class))).thenReturn(dto);
+
+        ReservationDTO result = reservationService.providerMarkNoShow(23L, 777L, "Bearer token");
+
+        assertSame(dto, result);
+        assertNotNull(reservation.getNoShowMarkedAt());
+        assertNull(reservation.getCheckedInAt());
+        verify(reservationDtoEnricher).enrichCustomerUsernamesForProvider(anyList(), eq("Bearer token"));
+    }
+
+    @Test
+    void providerCheckIn_rejectsReservationBeforeStart() {
+        Reservation reservation = Reservation.builder()
+                .id(24L)
+                .customerId("cust-1")
+                .branchId(10L)
+                .providerId(777L)
+                .startAt(LocalDateTime.now().plusMinutes(30))
+                .endAt(LocalDateTime.now().plusHours(2))
+                .status(ReservationStatus.CONFIRMED)
+                .lines(new ArrayList<>())
+                .build();
+
+        when(reservationRepository.findByIdAndProviderId(24L, 777L)).thenReturn(Optional.of(reservation));
+
+        ConflictException ex = assertThrows(
+                ConflictException.class,
+                () -> reservationService.providerCheckInReservation(24L, 777L, null)
+        );
+
+        assertTrue(ex.getMessage().contains("inicio de la franja"));
         verify(reservationRepository, never()).save(any());
     }
 

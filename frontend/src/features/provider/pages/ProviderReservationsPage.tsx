@@ -1,9 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { getMyBranches, getProviderReservationsPage } from '../../../api';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  getMyBranches,
+  getProviderReservationsPage,
+  providerCheckInReservation,
+  providerMarkNoShowReservation,
+} from '../../../api';
 import type { Reservation } from '../../../types/booking';
 import { branchesToMap, resolveReservationBranchDisplay } from '../../../utils/branchLookup';
 import {
+  type ReservationAttendanceFilter,
   type ReservationSortMode,
   type ReservationStatusFilter,
   type ReservationTimeFilter,
@@ -15,6 +21,8 @@ import { QueryErrorPanel } from '../../../components/ui/QueryErrorPanel';
 import { ReservationFiltersBar } from '../../../components/reservations/ReservationFiltersBar';
 import { ReservationDetailCard } from '../../../components/reservations/ReservationDetailCard';
 import { ProviderAreaNav } from '../../../components/provider/ProviderAreaNav';
+import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
+import { getApiErrorMessage } from '../../../utils/apiError';
 
 function toIsoParam(localDatetime: string): string | undefined {
   const t = localDatetime.trim();
@@ -23,14 +31,24 @@ function toIsoParam(localDatetime: string): string | undefined {
 }
 
 export function ProviderReservationsPage() {
+  const queryClient = useQueryClient();
   const [branchFilter, setBranchFilter] = useState<number | 'ALL'>('ALL');
   const [statusFilter, setStatusFilter] = useState<ReservationStatusFilter>('ALL');
   const [timeFilter, setTimeFilter] = useState<ReservationTimeFilter>('ALL');
+  const [attendanceFilter, setAttendanceFilter] = useState<ReservationAttendanceFilter>('ALL');
   const [sortMode, setSortMode] = useState<ReservationSortMode>('START_DESC');
   const [windowFrom, setWindowFrom] = useState('');
   const [windowTo, setWindowTo] = useState('');
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(15);
+  const [providerAction, setProviderAction] = useState<
+    | {
+        type: 'CHECK_IN' | 'NO_SHOW';
+        reservationId: number;
+      }
+    | null
+  >(null);
+  const [actionBanner, setActionBanner] = useState<string | null>(null);
 
   const listParams = useMemo(
     () => ({
@@ -38,17 +56,18 @@ export function ProviderReservationsPage() {
       size: pageSize,
       branchId: branchFilter === 'ALL' ? undefined : branchFilter,
       status: statusFilter === 'ALL' ? undefined : statusFilter,
+      attendance: attendanceFilter,
       time: timeFilter,
       from: toIsoParam(windowFrom),
       to: toIsoParam(windowTo),
       sort: sortMode === 'START_ASC' ? 'startAt,asc' : 'startAt,desc',
     }),
-    [page, pageSize, branchFilter, statusFilter, timeFilter, windowFrom, windowTo, sortMode]
+    [page, pageSize, branchFilter, statusFilter, attendanceFilter, timeFilter, windowFrom, windowTo, sortMode]
   );
 
   useEffect(() => {
     setPage(0);
-  }, [branchFilter, statusFilter, timeFilter, sortMode, windowFrom, windowTo, pageSize]);
+  }, [branchFilter, statusFilter, attendanceFilter, timeFilter, sortMode, windowFrom, windowTo, pageSize]);
 
   const listQuery = useQuery({
     queryKey: ['providerReservations', listParams],
@@ -59,6 +78,23 @@ export function ProviderReservationsPage() {
   const branchesQuery = useQuery({
     queryKey: ['providerBranches'],
     queryFn: getMyBranches,
+  });
+
+  const providerActionMutation = useMutation({
+    mutationFn: ({ reservationId, type }: { reservationId: number; type: 'CHECK_IN' | 'NO_SHOW' }) =>
+      type === 'CHECK_IN'
+        ? providerCheckInReservation(reservationId)
+        : providerMarkNoShowReservation(reservationId),
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['providerReservations'] });
+      queryClient.invalidateQueries({ queryKey: ['providerReservationMetrics'] });
+      setProviderAction(null);
+      setActionBanner(
+        vars.type === 'CHECK_IN'
+          ? 'Check-in registrado. La reserva queda marcada con presencia real del cliente.'
+          : 'No-show registrado. La reserva conserva su historial y refleja la ausencia del cliente.'
+      );
+    },
   });
 
   const rows: Reservation[] = listQuery.data?.content ?? [];
@@ -102,9 +138,15 @@ export function ProviderReservationsPage() {
   const hasFilters =
     branchFilter !== 'ALL' ||
     statusFilter !== 'ALL' ||
+    attendanceFilter !== 'ALL' ||
     timeFilter !== 'ALL' ||
     windowFrom.trim() !== '' ||
     windowTo.trim() !== '';
+
+  const actionTarget = providerAction != null ? rows.find((r) => r.id === providerAction.reservationId) ?? null : null;
+  const providerActionError =
+    providerActionMutation.error &&
+    getApiErrorMessage(providerActionMutation.error, 'No pudimos registrar la acción operativa.');
 
   return (
     <div className="main-content">
@@ -115,6 +157,21 @@ export function ProviderReservationsPage() {
       />
 
       <ProviderAreaNav />
+
+      {actionBanner ? (
+        <div className="alert alert-success alert--stack" role="status">
+          <strong>Operacion registrada</strong>
+          <p style={{ marginTop: '0.35rem', marginBottom: 0 }}>{actionBanner}</p>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ marginTop: '0.65rem' }}
+            onClick={() => setActionBanner(null)}
+          >
+            Cerrar aviso
+          </button>
+        </div>
+      ) : null}
 
       {listQuery.isError && (
         <QueryErrorPanel
@@ -154,10 +211,12 @@ export function ProviderReservationsPage() {
             branchId={branchFilter}
             status={statusFilter}
             time={timeFilter}
+            attendance={attendanceFilter}
             sort={sortMode}
             onBranchId={setBranchFilter}
             onStatus={setStatusFilter}
             onTime={setTimeFilter}
+            onAttendance={setAttendanceFilter}
             onSort={setSortMode}
             showWindowFilter
             windowFrom={windowFrom}
@@ -227,6 +286,13 @@ export function ProviderReservationsPage() {
                     reservation={r}
                     audience="provider"
                     branch={branch}
+                    providerActions={{
+                      onRequestCheckIn: (reservationId) =>
+                        setProviderAction({ reservationId, type: 'CHECK_IN' }),
+                      onRequestNoShow: (reservationId) =>
+                        setProviderAction({ reservationId, type: 'NO_SHOW' }),
+                      loading: providerActionMutation.isPending,
+                    }}
                   />
                 );
               })}
@@ -234,6 +300,28 @@ export function ProviderReservationsPage() {
           )}
         </>
       )}
+
+      <ConfirmDialog
+        open={providerAction != null}
+        title={providerAction?.type === 'CHECK_IN' ? '¿Registrar check-in?' : '¿Marcar no-show?'}
+        description={
+          actionTarget
+            ? providerAction?.type === 'CHECK_IN'
+              ? `La reserva #${actionTarget.id} quedará con presencia registrada para esta franja.`
+              : `La reserva #${actionTarget.id} quedará marcada como no-show una vez cerrada la franja.`
+            : 'Se registrará una acción operativa sobre la reserva seleccionada.'
+        }
+        confirmLabel={providerAction?.type === 'CHECK_IN' ? 'Sí, registrar' : 'Sí, marcar'}
+        cancelLabel="Volver"
+        loading={providerActionMutation.isPending}
+        errorHint={providerActionError}
+        onCancel={() => setProviderAction(null)}
+        onConfirm={() => {
+          if (providerAction) {
+            providerActionMutation.mutate(providerAction);
+          }
+        }}
+      />
     </div>
   );
 }

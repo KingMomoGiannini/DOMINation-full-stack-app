@@ -3,6 +3,7 @@ package com.domination.booking.controller;
 import com.domination.booking.domain.ReservationStatus;
 import com.domination.booking.dto.AvailabilityResponse;
 import com.domination.booking.dto.CreateReservationRequest;
+import com.domination.booking.dto.ProviderReservationAttendanceFilter;
 import com.domination.booking.dto.ProviderReservationMetricsDto;
 import com.domination.booking.dto.ProviderReservationTimeMode;
 import com.domination.booking.dto.ReservationDTO;
@@ -59,6 +60,7 @@ public class ReservationController {
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
             @RequestParam(required = false) Long branchId,
             @RequestParam(required = false) ReservationStatus status,
+            @RequestParam(required = false, defaultValue = "ALL") String attendance,
             @RequestParam(required = false, defaultValue = "ALL") String time,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
@@ -73,6 +75,7 @@ public class ReservationController {
                 providerId,
                 branchId,
                 status,
+                parseAttendanceFilter(attendance),
                 parseTimeMode(time),
                 from,
                 to,
@@ -87,6 +90,28 @@ public class ReservationController {
     public ResponseEntity<ProviderReservationMetricsDto> getProviderReservationMetrics(@AuthenticationPrincipal Jwt jwt) {
         Long providerId = extractUserId(jwt);
         return ResponseEntity.ok(reservationService.getProviderReservationMetrics(providerId));
+    }
+
+    @PostMapping("/provider/reservations/{id}/check-in")
+    @PreAuthorize("hasRole('PROVIDER')")
+    @Operation(summary = "Registrar check-in", description = "El prestador registra que el cliente se presentó dentro de la franja activa.")
+    public ResponseEntity<ReservationDTO> providerCheckInReservation(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization) {
+        Long providerId = extractUserId(jwt);
+        return ResponseEntity.ok(reservationService.providerCheckInReservation(id, providerId, authorization));
+    }
+
+    @PostMapping("/provider/reservations/{id}/no-show")
+    @PreAuthorize("hasRole('PROVIDER')")
+    @Operation(summary = "Marcar no-show", description = "El prestador marca que el cliente no se presentó una vez finalizada la franja.")
+    public ResponseEntity<ReservationDTO> providerMarkNoShow(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization) {
+        Long providerId = extractUserId(jwt);
+        return ResponseEntity.ok(reservationService.providerMarkNoShow(id, providerId, authorization));
     }
 
     @PostMapping("/reservations")
@@ -145,6 +170,19 @@ public class ReservationController {
             case "IN_PROGRESS" -> ProviderReservationTimeMode.IN_PROGRESS;
             case "COMPLETED", "PAST" -> ProviderReservationTimeMode.COMPLETED;
             default -> ProviderReservationTimeMode.ALL;
+        };
+    }
+
+    private static ProviderReservationAttendanceFilter parseAttendanceFilter(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return ProviderReservationAttendanceFilter.ALL;
+        }
+        return switch (raw.trim().toUpperCase()) {
+            case "CHECKED_IN" -> ProviderReservationAttendanceFilter.CHECKED_IN;
+            case "NO_SHOW" -> ProviderReservationAttendanceFilter.NO_SHOW;
+            case "NOT_RECORDED" -> ProviderReservationAttendanceFilter.NOT_RECORDED;
+            case "NOT_APPLICABLE" -> ProviderReservationAttendanceFilter.NOT_APPLICABLE;
+            default -> ProviderReservationAttendanceFilter.ALL;
         };
     }
 

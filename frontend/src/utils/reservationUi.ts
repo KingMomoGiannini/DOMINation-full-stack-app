@@ -2,6 +2,7 @@ import type { Reservation } from '../types/booking';
 
 export type ReservationStatusFilter = 'ALL' | 'PENDING' | 'CONFIRMED' | 'CANCELLED';
 export type ReservationTimeFilter = 'ALL' | 'UPCOMING' | 'IN_PROGRESS' | 'COMPLETED';
+export type ReservationAttendanceFilter = 'ALL' | 'NOT_RECORDED' | 'CHECKED_IN' | 'NO_SHOW' | 'NOT_APPLICABLE';
 export type ReservationSortMode = 'START_DESC' | 'START_ASC';
 
 function deriveOperationalStatusFallback(r: Reservation, nowMs: number): Reservation['operationalStatus'] {
@@ -27,12 +28,14 @@ export function reservationMatchesFilters(
     branchId: number | 'ALL';
     status: ReservationStatusFilter;
     time: ReservationTimeFilter;
+    attendance?: ReservationAttendanceFilter;
     nowMs?: number;
   }
 ): boolean {
   if (opts.branchId !== 'ALL' && r.branchId !== opts.branchId) return false;
   if (opts.status !== 'ALL' && r.status !== opts.status) return false;
   if (opts.time !== 'ALL' && getOperationalStatus(r, opts.nowMs) !== opts.time) return false;
+  if (opts.attendance && opts.attendance !== 'ALL' && r.attendanceStatus !== opts.attendance) return false;
   return true;
 }
 
@@ -95,4 +98,75 @@ export function getCancellationMessage(r: Reservation): string {
     return 'No puede cancelarse porque la franja ya comenzo o ya paso.';
   }
   return 'La accion queda sujeta a la politica vigente informada por el backend.';
+}
+
+export function getAttendanceMessage(r: Reservation): string {
+  if (r.attendanceStatus === 'CHECKED_IN') {
+    return r.checkedInAt
+      ? `Check-in registrado el ${formatCompactDateTime(r.checkedInAt)}.`
+      : 'Check-in registrado por el prestador.';
+  }
+  if (r.attendanceStatus === 'NO_SHOW') {
+    return r.noShowMarkedAt
+      ? `No-show marcado el ${formatCompactDateTime(r.noShowMarkedAt)}.`
+      : 'El prestador marcó la reserva como no-show.';
+  }
+  if (r.attendanceStatus === 'NOT_APPLICABLE') {
+    return 'Sin control de asistencia porque la reserva fue cancelada.';
+  }
+  return 'Todavía no hay un hecho operativo de asistencia persistido.';
+}
+
+export function getProviderCheckInMessage(r: Reservation): string {
+  if (r.providerCheckInAllowed) {
+    return 'Disponible mientras la franja esté en curso.';
+  }
+  switch (r.providerCheckInBlockReason) {
+    case 'CANCELLED':
+      return 'Bloqueado porque la reserva fue cancelada.';
+    case 'ALREADY_CHECKED_IN':
+      return 'Ya se registró la llegada del cliente.';
+    case 'ALREADY_MARKED_NO_SHOW':
+      return 'Bloqueado porque la reserva ya fue marcada como no-show.';
+    case 'BEFORE_START':
+      return 'Se habilita cuando comienza la franja.';
+    case 'AFTER_END':
+      return 'La franja ya terminó.';
+    default:
+      return 'La disponibilidad depende de la política vigente del backend.';
+  }
+}
+
+export function getProviderNoShowMessage(r: Reservation): string {
+  if (r.providerMarkNoShowAllowed) {
+    return 'Disponible una vez terminada la franja y si no hubo check-in.';
+  }
+  switch (r.providerMarkNoShowBlockReason) {
+    case 'CANCELLED':
+      return 'Bloqueado porque la reserva fue cancelada.';
+    case 'ALREADY_CHECKED_IN':
+      return 'No corresponde: ya hay check-in registrado.';
+    case 'ALREADY_MARKED_NO_SHOW':
+      return 'Ya fue marcada como no-show.';
+    case 'BEFORE_END':
+      return 'Se habilita cuando la franja termina.';
+    default:
+      return 'La disponibilidad depende de la política vigente del backend.';
+  }
+}
+
+function formatCompactDateTime(value: string): string {
+  try {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return new Intl.DateTimeFormat('es-AR', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(date);
+  } catch {
+    return value;
+  }
 }

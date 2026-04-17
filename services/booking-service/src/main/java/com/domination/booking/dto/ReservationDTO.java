@@ -41,6 +41,34 @@ public class ReservationDTO {
      * Motivo derivado cuando la reserva ya no puede cancelarse.
      */
     private ReservationCancellationBlockReason cancellationBlockReason;
+    /**
+     * Vista operativa derivada a partir de hechos persistidos de asistencia.
+     */
+    private ReservationAttendanceStatus attendanceStatus;
+    /**
+     * Hecho persistido: momento en el que el prestador registró check-in.
+     */
+    private LocalDateTime checkedInAt;
+    /**
+     * Hecho persistido: momento en el que el prestador marcó no-show.
+     */
+    private LocalDateTime noShowMarkedAt;
+    /**
+     * Flag derivado para habilitar CTA de check-in en UI del prestador.
+     */
+    private boolean providerCheckInAllowed;
+    /**
+     * Motivo derivado cuando check-in no corresponde.
+     */
+    private ReservationProviderActionBlockReason providerCheckInBlockReason;
+    /**
+     * Flag derivado para habilitar CTA de no-show en UI del prestador.
+     */
+    private boolean providerMarkNoShowAllowed;
+    /**
+     * Motivo derivado cuando marcar no-show no corresponde.
+     */
+    private ReservationProviderActionBlockReason providerMarkNoShowBlockReason;
     private LocalDateTime createdAt;
     
     @Builder.Default
