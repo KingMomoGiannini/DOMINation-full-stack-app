@@ -60,7 +60,7 @@ Cada microservicio sigue una arquitectura en capas, con responsabilidades bien d
 ### Observabilidad y trazabilidad
 
 1. **Métricas**: cada servicio expone métricas de Actuator y Micrometer. Prometheus las recolecta regularmente según lo definido en `prometheus.yml`. 
-2. **Dashboards**: Grafana proporciona paneles preconfigurados para JVM, latencia, throughput y errores. Esto permite monitorear el comportamiento de cada microservicio en tiempo real. 
+2. **Dashboards**: Grafana esta disponible en Docker Compose, pero los dashboards se configuran manualmente; no hay provisioning automatico versionado en el repositorio. 
 3. **RequestId**: el gateway añade una cabecera `X‑Request‑Id` única. Los servicios incluyen filtros que leen esta cabecera y la inyectan en el *Mapped Diagnostic Context* (MDC) para que los logs puedan correlacionarse a través de los microservicios.
 
 ## Deuda técnica y oportunidades
@@ -68,7 +68,7 @@ Cada microservicio sigue una arquitectura en capas, con responsabilidades bien d
 Al analizar el código se identificaron varias áreas susceptibles de mejora:
 
 1. **Versionado de Spring Boot**: el gateway utiliza una versión 3.5.x mientras que los microservicios usan 4.x. Unificar las versiones reducirá problemas de compatibilidad y mantenimiento.
-2. **Scripts de migración**: se declara la dependencia de Flyway pero faltan migraciones para `booking-service`, y la propiedad `spring.jpa.hibernate.ddl-auto=update` sigue activa. Es necesario crear scripts de migración y desactivar la creación automática de tablas en producción.
+2. **Scripts de migración**: `booking-service` ya cuenta con Flyway y migraciones reales. `catalog-service` incorporo Flyway en el Sprint 19 y `auth-service` sigue pendiente; es necesario avanzar progresivamente hacia `ddl-auto=validate` en entornos controlados.
 3. **Seguridad y secretos**: actualmente el `clientSecret` del `auth-service` está codificado en texto plano y las claves RSA se encuentran en código. Estos secretos deberían externalizarse mediante variables de entorno o gestores de secretos.
 4. **Documentación desactualizada**: algunos documentos mencionan funcionalidades no implementadas (por ejemplo, orquestación BPM). Es importante sincronizar la documentación con el estado real del código y marcar las diferencias.
 5. **Pruebas automatizadas**: la cobertura de tests es desigual. Se recomienda añadir pruebas de integración, de seguridad y de flujos de negocio completos utilizando herramientas como Testcontainers.
