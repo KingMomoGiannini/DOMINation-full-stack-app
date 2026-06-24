@@ -6,7 +6,9 @@ import com.domination.booking.dto.CreateReservationRequest;
 import com.domination.booking.dto.ProviderReservationAttendanceFilter;
 import com.domination.booking.dto.ProviderReservationMetricsDto;
 import com.domination.booking.dto.ProviderReservationTimeMode;
+import com.domination.booking.dto.ReservationAuditEventDTO;
 import com.domination.booking.dto.ReservationDTO;
+import com.domination.booking.service.ReservationAuditService;
 import com.domination.booking.service.ReservationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -27,6 +29,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -40,6 +43,7 @@ import java.util.List;
 public class ReservationController {
 
     private final ReservationService reservationService;
+    private final ReservationAuditService reservationAuditService;
 
     @GetMapping("/my/reservations")
     @PreAuthorize("hasRole('USER')")
@@ -221,6 +225,35 @@ public class ReservationController {
         String customerId = String.valueOf(extractUserId(jwt));
         return reservationService.cancelReservation(id,customerId);
 
+    }
+
+    @GetMapping("/reservations/{id}/audit")
+    @PreAuthorize("hasAnyRole('USER','PROVIDER','ADMIN')")
+    @Operation(summary = "Auditoría operativa de reserva", description = "Lista eventos auditables de una reserva según ownership del usuario autenticado.")
+    public ResponseEntity<List<ReservationAuditEventDTO>> getReservationAudit(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        String actorUserId = String.valueOf(extractUserId(jwt));
+        return ResponseEntity.ok(reservationAuditService.getAuditForReservation(id, actorUserId, extractRoles(jwt)));
+    }
+
+    private static List<String> extractRoles(Jwt jwt) {
+        Object rawAuthorities = jwt.getClaim("authorities");
+        List<String> roles = new ArrayList<>();
+        if (rawAuthorities instanceof Iterable<?> iterable) {
+            for (Object authority : iterable) {
+                if (authority != null) {
+                    roles.add(String.valueOf(authority));
+                }
+            }
+        } else if (rawAuthorities instanceof String authority && !authority.isBlank()) {
+            roles.add(authority);
+        }
+        if (roles.isEmpty()) {
+            throw new IllegalStateException("authorities no encontrado en JWT");
+        }
+        return roles;
     }
 }
 

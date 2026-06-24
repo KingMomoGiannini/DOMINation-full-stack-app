@@ -40,6 +40,7 @@ class ReservationServiceTest {
     @Mock private ReservationMapper reservationMapper;
     @Mock private CatalogClient catalogClient;
     @Mock private ReservationDtoEnricher reservationDtoEnricher;
+    @Mock private ReservationAuditService reservationAuditService;
     @Spy private ReservationLifecycleResolver reservationLifecycleResolver;
 
     @InjectMocks private ReservationService reservationService;
@@ -149,6 +150,7 @@ class ReservationServiceTest {
 
         verify(reservationRepository, never()).save(any());
         verify(reservationMapper, never()).toDTO(any());
+        verifyNoInteractions(reservationAuditService);
     }
 
     @Test
@@ -183,6 +185,7 @@ class ReservationServiceTest {
 
         verify(reservationRepository, never()).save(any());
         verify(reservationMapper, never()).toDTO(any());
+        verifyNoInteractions(reservationAuditService);
     }
 
     @Test
@@ -217,6 +220,7 @@ class ReservationServiceTest {
                 () -> reservationService.createReservation(request, "cust-1"));
 
         verify(reservationRepository, never()).save(any());
+        verifyNoInteractions(reservationAuditService);
         verify(reservationMapper, never()).toDTO(any());
     }
 
@@ -281,6 +285,7 @@ class ReservationServiceTest {
         assertEquals(new BigDecimal("300.00"), line.getPrice()); // 100 * 3
 
         verify(reservationRepository).save(any(Reservation.class));
+        verify(reservationAuditService).recordCreated(saved, "cust-1");
         verify(reservationMapper).toDTO(any(Reservation.class));
         verify(reservationDtoEnricher).enrichMissingCatalogFields(anyList());
     }
@@ -319,6 +324,7 @@ class ReservationServiceTest {
                 () -> reservationService.createReservation(request, "cust-1"));
 
         verify(reservationRepository, never()).save(any());
+        verifyNoInteractions(reservationAuditService);
     }
 
     @Test
@@ -370,6 +376,7 @@ class ReservationServiceTest {
 
         assertSame(dto, result);
         assertEquals(ReservationStatus.CANCELLED, reservation.getStatus());
+        verify(reservationAuditService).recordCancelledByCustomer(reservation, "cust-1");
         verify(catalogClient, times(2)).releaseInventory(any());
     }
 
@@ -405,6 +412,7 @@ class ReservationServiceTest {
         assertSame(dto, result);
         verify(catalogClient, never()).releaseInventory(any());
         verify(reservationRepository, never()).save(any());
+        verifyNoInteractions(reservationAuditService);
     }
 
     @Test
@@ -431,6 +439,7 @@ class ReservationServiceTest {
         assertSame(dto, result);
         assertNotNull(reservation.getCheckedInAt());
         assertNull(reservation.getNoShowMarkedAt());
+        verify(reservationAuditService).recordCheckedIn(reservation, 777L);
         verify(reservationDtoEnricher).enrichCustomerUsernamesForProvider(anyList(), eq("Bearer token"));
     }
 
@@ -458,6 +467,7 @@ class ReservationServiceTest {
         assertSame(dto, result);
         assertNotNull(reservation.getNoShowMarkedAt());
         assertNull(reservation.getCheckedInAt());
+        verify(reservationAuditService).recordMarkedNoShow(reservation, 777L);
         verify(reservationDtoEnricher).enrichCustomerUsernamesForProvider(anyList(), eq("Bearer token"));
     }
 
@@ -483,6 +493,7 @@ class ReservationServiceTest {
 
         assertTrue(ex.getMessage().contains("inicio de la franja"));
         verify(reservationRepository, never()).save(any());
+        verifyNoInteractions(reservationAuditService);
     }
 
     // ---------- helpers ----------

@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Verifica que el historial Flyway del booking-service crea el esquema esperado en PostgreSQL real.
  */
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 class FlywayBookingSchemaIT {
 
     @Container
@@ -43,11 +43,16 @@ class FlywayBookingSchemaIT {
             DatabaseMetaData md = c.getMetaData();
             assertTableExists(md, "reservations");
             assertTableExists(md, "reservation_lines");
+            assertTableExists(md, "reservation_audit_events");
             assertColumnExists(md, "reservations", "branch_name");
             assertColumnExists(md, "reservation_lines", "item_name");
+            assertColumnExists(md, "reservation_audit_events", "event_type");
+            assertColumnExists(md, "reservation_audit_events", "actor_user_id");
             assertIndexExists(md, "reservations", "idx_reservations_customer_start_id");
             assertIndexExists(md, "reservations", "idx_reservations_provider_start_id");
             assertIndexExists(md, "reservations", "idx_reservations_provider_branch_start_id");
+            assertIndexExists(md, "reservation_audit_events", "idx_reservation_audit_events_reservation_id");
+            assertIndexExists(md, "reservation_audit_events", "idx_reservation_audit_events_reservation_created_at");
         }
     }
 
@@ -73,6 +78,6 @@ class FlywayBookingSchemaIT {
                 }
             }
         }
-        assertTrue(indexNames.contains(indexName.toLowerCase(Locale.ROOT)), "índice faltante: " + indexName);
+        assertTrue(indexNames.contains(indexName.toLowerCase(Locale.ROOT)), "indice faltante: " + indexName);
     }
 }

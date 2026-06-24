@@ -45,6 +45,7 @@ public class ReservationService {
     private final CatalogClient catalogClient;
     private final ReservationDtoEnricher reservationDtoEnricher;
     private final ReservationLifecycleResolver reservationLifecycleResolver;
+    private final ReservationAuditService reservationAuditService;
 
     @Transactional(readOnly = true)
     public List<ReservationDTO> getMyReservations(String customerId) {
@@ -170,6 +171,7 @@ public class ReservationService {
 
         // Guardar la reserva
         Reservation saved = reservationRepository.save(reservation);
+        reservationAuditService.recordCreated(saved, customerId);
         log.info("Reserva creada con id: {}", saved.getId());
 
         ReservationDTO dto = reservationMapper.toDTO(saved);
@@ -398,6 +400,7 @@ public class ReservationService {
         }
         reservation.setStatus(ReservationStatus.CANCELLED);
         Reservation saved = reservationRepository.save(reservation);
+        reservationAuditService.recordCancelledByCustomer(saved, customerId);
 
         // Liberación best-effort de holds de líneas TIME_QUANTITY
         saved.getLines().stream()
@@ -421,6 +424,7 @@ public class ReservationService {
         reservation.setCheckedInAt(now);
         reservation.setNoShowMarkedAt(null);
         Reservation saved = reservationRepository.save(reservation);
+        reservationAuditService.recordCheckedIn(saved, providerId);
         return mapProviderReservation(saved, authorizationHeader);
     }
 
@@ -435,6 +439,7 @@ public class ReservationService {
         reservation.setNoShowMarkedAt(now);
         reservation.setCheckedInAt(null);
         Reservation saved = reservationRepository.save(reservation);
+        reservationAuditService.recordMarkedNoShow(saved, providerId);
         return mapProviderReservation(saved, authorizationHeader);
     }
 
