@@ -83,7 +83,9 @@ public class ReservationAuditService {
             Long reservationId,
             String actorUserId,
             Collection<String> actorRoles) {
-        if (!canViewReservationAudit(reservationId, actorUserId, actorRoles)) {
+        Reservation reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new NotFoundException("Reserva no encontrada"));
+        if (!canViewReservationAudit(reservation, actorUserId, actorRoles)) {
             throw new NotFoundException("Reserva no encontrada");
         }
         return auditEventRepository.findByReservationIdOrderByCreatedAtAsc(reservationId).stream()
@@ -109,17 +111,16 @@ public class ReservationAuditService {
         auditEventRepository.save(event);
     }
 
-    private boolean canViewReservationAudit(Long reservationId, String actorUserId, Collection<String> actorRoles) {
+    private boolean canViewReservationAudit(Reservation reservation, String actorUserId, Collection<String> actorRoles) {
         if (hasRole(actorRoles, ROLE_ADMIN)) {
             return true;
         }
-        if (hasRole(actorRoles, ROLE_USER)
-                && reservationRepository.findByIdAndCustomerId(reservationId, actorUserId).isPresent()) {
-            return true;
+        if (hasRole(actorRoles, ROLE_USER)) {
+            return Objects.equals(reservation.getCustomerId(), actorUserId);
         }
         if (hasRole(actorRoles, ROLE_PROVIDER)) {
             return parseProviderId(actorUserId)
-                    .map(providerId -> reservationRepository.findByIdAndProviderId(reservationId, providerId).isPresent())
+                    .map(providerId -> Objects.equals(reservation.getProviderId(), providerId))
                     .orElse(false);
         }
         return false;

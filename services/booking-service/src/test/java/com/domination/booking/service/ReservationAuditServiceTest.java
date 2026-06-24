@@ -60,7 +60,7 @@ class ReservationAuditServiceTest {
         ReservationAuditEvent event = auditEvent(reservation, ReservationAuditEventType.CREATED);
         ReservationAuditEventDTO dto = ReservationAuditEventDTO.builder().id(1L).reservationId(10L).build();
 
-        when(reservationRepository.findByIdAndCustomerId(10L, "101")).thenReturn(Optional.of(reservation));
+        when(reservationRepository.findById(10L)).thenReturn(Optional.of(reservation));
         when(auditEventRepository.findByReservationIdOrderByCreatedAtAsc(10L)).thenReturn(List.of(event));
         when(auditEventMapper.toDTO(event)).thenReturn(dto);
 
@@ -80,7 +80,7 @@ class ReservationAuditServiceTest {
         ReservationAuditEvent event = auditEvent(reservation, ReservationAuditEventType.CHECKED_IN);
         ReservationAuditEventDTO dto = ReservationAuditEventDTO.builder().id(2L).reservationId(10L).build();
 
-        when(reservationRepository.findByIdAndProviderId(10L, 777L)).thenReturn(Optional.of(reservation));
+        when(reservationRepository.findById(10L)).thenReturn(Optional.of(reservation));
         when(auditEventRepository.findByReservationIdOrderByCreatedAtAsc(10L)).thenReturn(List.of(event));
         when(auditEventMapper.toDTO(event)).thenReturn(dto);
 
@@ -95,11 +95,25 @@ class ReservationAuditServiceTest {
     }
 
     @Test
-    void getAuditForReservation_allowsAdminWithoutOwnershipLookup() {
+    void getAuditForReservation_adminThrowsNotFoundWhenReservationDoesNotExist() {
+        when(reservationRepository.findById(10L)).thenReturn(Optional.empty());
+
+        assertThrows(NotFoundException.class, () -> reservationAuditService.getAuditForReservation(
+                10L,
+                "1",
+                List.of("ROLE_ADMIN")
+        ));
+
+        verifyNoInteractions(auditEventRepository);
+    }
+
+    @Test
+    void getAuditForReservation_allowsAdminWhenReservationExists() {
         Reservation reservation = Reservation.builder().id(10L).build();
         ReservationAuditEvent event = auditEvent(reservation, ReservationAuditEventType.MARKED_NO_SHOW);
         ReservationAuditEventDTO dto = ReservationAuditEventDTO.builder().id(3L).reservationId(10L).build();
 
+        when(reservationRepository.findById(10L)).thenReturn(Optional.of(reservation));
         when(auditEventRepository.findByReservationIdOrderByCreatedAtAsc(10L)).thenReturn(List.of(event));
         when(auditEventMapper.toDTO(event)).thenReturn(dto);
 
@@ -110,17 +124,32 @@ class ReservationAuditServiceTest {
         );
 
         assertEquals(List.of(dto), result);
-        verifyNoInteractions(reservationRepository);
+        verify(reservationRepository).findById(10L);
     }
 
     @Test
     void getAuditForReservation_rejectsUserWithoutOwnership() {
-        when(reservationRepository.findByIdAndCustomerId(10L, "202")).thenReturn(Optional.empty());
+        Reservation reservation = Reservation.builder().id(10L).customerId("101").build();
+        when(reservationRepository.findById(10L)).thenReturn(Optional.of(reservation));
 
         assertThrows(NotFoundException.class, () -> reservationAuditService.getAuditForReservation(
                 10L,
                 "202",
                 List.of("ROLE_USER")
+        ));
+
+        verifyNoInteractions(auditEventRepository);
+    }
+
+    @Test
+    void getAuditForReservation_rejectsProviderWithNonNumericActorUserId() {
+        Reservation reservation = Reservation.builder().id(10L).providerId(777L).build();
+        when(reservationRepository.findById(10L)).thenReturn(Optional.of(reservation));
+
+        assertThrows(NotFoundException.class, () -> reservationAuditService.getAuditForReservation(
+                10L,
+                "provider-demo",
+                List.of("ROLE_PROVIDER")
         ));
 
         verifyNoInteractions(auditEventRepository);

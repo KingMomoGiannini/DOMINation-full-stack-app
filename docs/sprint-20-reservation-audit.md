@@ -102,11 +102,14 @@ El endpoint requiere JWT y acepta:
 
 Reglas:
 
+- El endpoint primero valida que la reserva exista.
 - `ROLE_USER` puede ver auditoria solo de reservas donde `customerId` coincide con su `userId`.
 - `ROLE_PROVIDER` puede ver auditoria solo de reservas donde `providerId` coincide con su `userId`.
-- `ROLE_ADMIN` puede ver auditoria de cualquier reserva.
+- `ROLE_ADMIN` puede ver auditoria de cualquier reserva existente.
 
-Si el usuario autenticado no tiene ownership sobre la reserva, el servicio responde como reserva no encontrada para no filtrar existencia.
+Si la reserva no existe, incluso `ROLE_ADMIN` recibe `Reserva no encontrada`.
+
+Si el usuario autenticado no tiene ownership sobre la reserva, el servicio responde como `Reserva no encontrada` para no filtrar existencia.
 
 ## Registro de eventos
 
