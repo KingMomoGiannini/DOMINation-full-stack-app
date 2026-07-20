@@ -16,6 +16,7 @@ import {
   isReservationLiveNow,
 } from '../../utils/reservationUi';
 import { ReservationLineItems } from './ReservationLineItems';
+import { ReservationAuditTimeline } from './ReservationAuditTimeline';
 import { ReservationScheduleBlock } from './ReservationScheduleBlock';
 import { ReservationStatusBadge } from './ReservationStatusBadge';
 
@@ -182,6 +183,8 @@ export function ReservationDetailCard({
       </div>
 
       <ReservationLineItems lines={reservation.lines ?? []} />
+
+      <ReservationAuditTimeline reservationId={reservation.id} />
 
       <div className="reservation-card__secondary">
         <span>Creada el {formatReservationCreatedAt(reservation.createdAt)}</span>

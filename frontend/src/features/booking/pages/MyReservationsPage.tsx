@@ -55,8 +55,9 @@ export function MyReservationsPage() {
 
   const cancelMutation = useMutation({
     mutationFn: cancelReservation,
-    onSuccess: () => {
+    onSuccess: (reservation) => {
       queryClient.invalidateQueries({ queryKey: ['myReservations'] });
+      queryClient.invalidateQueries({ queryKey: ['reservationAudit', reservation.id] });
       setConfirmId(null);
       setCancelSuccess(true);
     },

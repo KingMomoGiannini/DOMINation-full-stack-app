@@ -67,3 +67,20 @@ export interface AvailabilityResponse {
   available: boolean;
   conflicts: AvailabilityConflict[];
 }
+
+export type ReservationAuditEventType =
+  | 'CREATED'
+  | 'CANCELLED_BY_CUSTOMER'
+  | 'CHECKED_IN'
+  | 'MARKED_NO_SHOW';
+
+export interface ReservationAuditEvent {
+  id: number;
+  reservationId: number;
+  actorUserId: string;
+  actorRole: string;
+  eventType: ReservationAuditEventType;
+  reason?: string | null;
+  comment?: string | null;
+  createdAt: string;
+}

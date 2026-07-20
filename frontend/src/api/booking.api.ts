@@ -2,6 +2,7 @@ import type {
   AvailabilityResponse,
   CreateReservationRequest,
   Reservation,
+  ReservationAuditEvent,
 } from '../types/booking';
 import type { PageResponse } from '../types/page';
 import { http } from './http';
@@ -10,6 +11,8 @@ export type {
   AvailabilityResponse,
   CreateReservationRequest,
   Reservation,
+  ReservationAuditEvent,
+  ReservationAuditEventType,
   ReservationLine,
   AvailabilityConflict,
 } from '../types/booking';
@@ -33,6 +36,15 @@ export const createReservation = async (request: CreateReservationRequest): Prom
 
 export const cancelReservation = async (id: number): Promise<Reservation> => {
   const { data } = await http.post<Reservation>(`/api/booking/reservations/${id}/cancel`);
+  return data;
+};
+
+export const getReservationAudit = async (
+  reservationId: number
+): Promise<ReservationAuditEvent[]> => {
+  const { data } = await http.get<ReservationAuditEvent[]>(
+    `/api/booking/reservations/${reservationId}/audit`
+  );
   return data;
 };
 

@@ -1102,6 +1102,203 @@ body {
   opacity: 0.9;
 }
 
+/* Historial operativo de reservas */
+.reservation-audit {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.reservation-audit__toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 0;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  text-align: left;
+}
+
+.reservation-audit__toggle > span:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.reservation-audit__toggle strong {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.3rem;
+  font-weight: 400;
+  letter-spacing: 1px;
+}
+
+.reservation-audit__toggle small {
+  font-family: 'Arial', sans-serif;
+  font-size: 0.78rem;
+  color: var(--gray-light);
+}
+
+.reservation-audit__toggle-label {
+  flex-shrink: 0;
+  font-family: 'Arial', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #ffaaaa;
+}
+
+.reservation-audit__toggle-label::after {
+  content: ' +';
+}
+
+.reservation-audit--open .reservation-audit__toggle-label::after {
+  content: ' −';
+}
+
+.reservation-audit__toggle:hover .reservation-audit__toggle-label,
+.reservation-audit__toggle:focus-visible .reservation-audit__toggle-label {
+  color: #fff;
+}
+
+.reservation-audit__toggle:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+
+.reservation-audit__panel {
+  padding: 0.25rem 0 1rem;
+}
+
+.reservation-audit__state,
+.reservation-audit__error {
+  font-family: 'Arial', sans-serif;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--gray-light);
+  margin: 0;
+  padding: 0.9rem 1rem;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.reservation-audit__error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  color: #ffd2d2;
+  border: 1px solid rgba(255, 80, 80, 0.35);
+}
+
+.reservation-audit__error p {
+  margin: 0;
+}
+
+.reservation-audit__retry {
+  flex-shrink: 0;
+  padding: 0.45rem 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  font-family: 'Arial', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.reservation-audit__retry:hover,
+.reservation-audit__retry:focus-visible {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.reservation-audit__list {
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem 0 0 0.35rem;
+}
+
+.reservation-audit__event {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1rem minmax(0, 1fr);
+  gap: 0.7rem;
+  padding-bottom: 1rem;
+}
+
+.reservation-audit__event:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  top: 0.8rem;
+  bottom: 0;
+  left: 0.42rem;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.reservation-audit__marker {
+  position: relative;
+  z-index: 1;
+  width: 0.85rem;
+  height: 0.85rem;
+  margin-top: 0.22rem;
+  border: 2px solid var(--primary);
+  border-radius: 50%;
+  background: var(--secondary);
+  box-shadow: 0 0 0 4px rgba(255, 14, 14, 0.12);
+}
+
+.reservation-audit__event-body {
+  min-width: 0;
+  font-family: 'Arial', sans-serif;
+}
+
+.reservation-audit__event-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.reservation-audit__event-heading strong {
+  color: #fff;
+  font-size: 0.95rem;
+}
+
+.reservation-audit__event-heading time {
+  flex-shrink: 0;
+  color: var(--gray-light);
+  font-size: 0.76rem;
+}
+
+.reservation-audit__actor {
+  margin: 0.25rem 0 0;
+  color: #c8c8c8;
+  font-size: 0.78rem;
+}
+
+.reservation-audit__detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.45rem 0 0;
+  color: #e7e7e7;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.reservation-audit__detail span {
+  color: var(--gray-light);
+  font-weight: 700;
+}
+
+.reservation-audit__detail span::after {
+  content: ':';
+}
+
 /* Área admin — solicitudes prestador */
 .admin-area-intro {
   font-family: 'Arial', sans-serif;
@@ -1327,6 +1524,17 @@ body {
 
   .reservation-card__facts {
     grid-template-columns: 1fr;
+  }
+
+  .reservation-audit__toggle,
+  .reservation-audit__error,
+  .reservation-audit__event-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .reservation-audit__event-heading time {
+    flex-shrink: 1;
   }
 }
 
