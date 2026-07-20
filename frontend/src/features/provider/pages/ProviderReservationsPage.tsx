@@ -85,9 +85,10 @@ export function ProviderReservationsPage() {
       type === 'CHECK_IN'
         ? providerCheckInReservation(reservationId)
         : providerMarkNoShowReservation(reservationId),
-    onSuccess: (_data, vars) => {
+    onSuccess: (reservation, vars) => {
       queryClient.invalidateQueries({ queryKey: ['providerReservations'] });
       queryClient.invalidateQueries({ queryKey: ['providerReservationMetrics'] });
+      queryClient.invalidateQueries({ queryKey: ['reservationAudit', reservation.id] });
       setProviderAction(null);
       setActionBanner(
         vars.type === 'CHECK_IN'
