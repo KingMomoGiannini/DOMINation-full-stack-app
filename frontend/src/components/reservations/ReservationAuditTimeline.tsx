@@ -51,7 +51,7 @@ function renderEvent(event: ReservationAuditEvent) {
       <span className="reservation-audit__marker" aria-hidden="true" />
       <div className="reservation-audit__event-body">
         <div className="reservation-audit__event-heading">
-          <strong>{eventLabels[event.eventType]}</strong>
+          <strong>{eventLabels[event.eventType] ?? event.eventType}</strong>
           <time dateTime={event.createdAt}>{formatEventDate(event.createdAt)}</time>
         </div>
         <p className="reservation-audit__actor">
